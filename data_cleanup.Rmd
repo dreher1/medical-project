@@ -17,12 +17,31 @@ melanoma_data_cleaned <- melanoma_data_cleaned[-1, ]
 melanoma_data_cleaned <- melanoma_data_cleaned[, -c(7, 8, 9)]
 
 
+    
+library(stringr)
+
+split <- str_split(melanoma_data_cleaned[[1]],", ")
+counties <-sapply (split,
+                   function(x) {x[1]})
+
+states <-sapply (split,
+                   function(x) {x[2]})
+
+counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
+
+melanoma_data_cleaned$county <- counties
+melanoma_data_cleaned$state  <- states
+
+
+    
 ```
 
 ```{r}
 library(readxl)
 uv_county <- read_excel("uv-county.xlsx")
 View(uv_county)
+colname(uv_county)[1] <-"state_"
+
 ```
 
 
@@ -30,5 +49,16 @@ View(uv_county)
 library(readr)
 county_demographics <- read.csv("county_demographics.csv")
 View(county_demographics)
+```
+
+```{r}
+library(stringr)
+t <- c("county1,stat1(10)","county2,stat2(1)")
+split <- str_split(t,",")
+counties <-sapply (split,
+                   function(x) {x[1]})
+
+counties <-sapply (split,
+                   function(x) {x[2]})
 ```
 
