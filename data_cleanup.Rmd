@@ -5,8 +5,25 @@ date: "2025-10-13"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r}
 library(readr)
-melanoma_data_cleaned <- read_csv("melanoma_data_cleaned.csv")
+melanoma_data_cleaned <- read.csv("melanoma_data_cleaned.csv")
+View(melanoma_data_cleaned)
+
+
+
+```
+
+```{r}
+library(readxl)
+uv_county <- read_excel("uv-county.xlsx")
+View(uv_county)
+```
+
+
+```{r}
+library(readr)
+county_demographics <- read.csv("county_demographics.csv")
+View(county_demographics)
 ```
 
