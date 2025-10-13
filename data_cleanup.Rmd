@@ -9,7 +9,10 @@ output: html_document
 library(readr)
 melanoma_data_cleaned <- read.csv("melanoma_data_cleaned.csv")
 View(melanoma_data_cleaned)
-
+colnames(melanoma_data_cleaned)[1] <- "county"
+colnames(melanoma_data_cleaned)[2] <- "fips"
+colnames(melanoma_data_cleaned)[3] <- "county_type"
+colnames(melanoma_data_cleaned)[4] <- "age_adj_inc_rate"
 
 
 ```
