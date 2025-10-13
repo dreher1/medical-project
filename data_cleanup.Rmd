@@ -9,13 +9,19 @@ output: html_document
 library(readr)
 melanoma_data_cleaned <- read.csv("melanoma_data_cleaned.csv")
 View(melanoma_data_cleaned)
-colnames(melanoma_data_cleaned)[1] <- "county"
-colnames(melanoma_data_cleaned)[2] <- "fips"
+colnames(melanoma_data_cleaned)[1] <- "county_melanoma"
+colnames(melanoma_data_cleaned)[2] <- "fips_melanoma"
 colnames(melanoma_data_cleaned)[3] <- "county_type"
 colnames(melanoma_data_cleaned)[4] <- "age_adj_inc_rate"
 melanoma_data_cleaned <- melanoma_data_cleaned[-1, ] 
 melanoma_data_cleaned <- melanoma_data_cleaned[, -c(7, 8, 9)]
-
+colnames(melanoma_data_cleaned)[5] <- "lower_95_conf"
+colnames(melanoma_data_cleaned)[6] <- "upper_95_conf"
+colnames(melanoma_data_cleaned)[7] <- "avg_annual_ct"
+colnames(melanoma_data_cleaned)[8] <- "recent_trend"
+colnames(melanoma_data_cleaned)[9] <- "recnet_five_yr_trend"
+colnames(melanoma_data_cleaned)[10] <- "lower_95_ci"
+colnames(melanoma_data_cleaned)[11] <- "upper_95_ci"
 
 ```
 
@@ -23,6 +29,11 @@ melanoma_data_cleaned <- melanoma_data_cleaned[, -c(7, 8, 9)]
 library(readxl)
 uv_county <- read_excel("uv-county.xlsx")
 View(uv_county)
+colnames(uv_county)[1] <- "state_uv"
+colnames(uv_county)[2] <- "state_abr"
+colnames(uv_county)[3] <- "fips_uv"
+colnames(uv_county)[4] <- "county_name"
+colnames(uv_county)[5] <- "uv_whm2"
 ```
 
 
@@ -30,5 +41,19 @@ View(uv_county)
 library(readr)
 county_demographics <- read.csv("county_demographics.csv")
 View(county_demographics)
+colnames(county_demographics)[1] <- "county_demo"
+colnames(county_demographics)[2] <- "state_abr_demo"
+colnames(county_demographics)[3] <- "age_pct_over_65"
+colnames(county_demographics)[4] <- "age_pct_under_18"
+colnames(county_demographics)[5] <- "age_pct_under_5"
+colnames(county_demographics)[6] <- "american_indian_alaska_native_pct"
+colnames(county_demographics)[7] <- "asian_pct"
+colnames(county_demographics)[8] <- "black_pct"
+colnames(county_demographics)[9] <- "hispanic_or_latino_pct"
+colnames(county_demographics)[10] <- "hawaiian_pacific_islander_pct"
+colnames(county_demographics)[11] <- "two_more_races"
+colnames(county_demographics)[12] <- "white_pct"
+colnames(county_demographics)[13] <- "white_not_horl_pct"
+
 ```
 
