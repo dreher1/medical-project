@@ -13,6 +13,11 @@ colnames(melanoma_data_cleaned)[1] <- "county"
 colnames(melanoma_data_cleaned)[2] <- "fips"
 colnames(melanoma_data_cleaned)[3] <- "county_type"
 colnames(melanoma_data_cleaned)[4] <- "age_adj_inc_rate"
+melanoma_data_cleaned <- melanoma_data_cleaned[-1, ] 
+melanoma_data_cleaned <- melanoma_data_cleaned[, -5]
+melanoma_data_cleaned <- melanoma_data_cleaned[, -6]
+
+
 
 
 ```
