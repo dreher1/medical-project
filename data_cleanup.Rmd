@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-
+library(readr)
+melanoma_data_cleaned <- read_csv("melanoma_data_cleaned.csv")
 ```
 
