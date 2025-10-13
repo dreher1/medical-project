@@ -9,6 +9,9 @@ output: html_document
 library(readr)
 melanoma_data_cleaned <- read.csv("melanoma_data_cleaned.csv")
 View(melanoma_data_cleaned)
+melanoma_data_cleaned <- melanoma_data_cleaned[-1, ] #deletes first row
+melanoma_data_cleaned <- melanoma_data_cleaned[, -5]
+melanoma_data_cleaned <- melanoma_data_cleaned[, -6]
 
 
 
