@@ -38,7 +38,10 @@ counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$"
 melanoma_data_cleaned$county <- counties
 melanoma_data_cleaned$state  <- states
 
-gsub("(6)","",melanoma_data_cleaned$state, fixed=TRUE)
+#Need to look at district of Colombia and where to put that 
+
+melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cleaned$state)
+
     
 ```
 
