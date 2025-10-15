@@ -77,14 +77,5 @@ colnames(county_demographics)[13] <- "white_not_horl_pct"
 
 ```
 
-```{r}
-library(stringr)
-t <- c("county1,stat1(10)","county2,stat2(1)")
-split <- str_split(t,",")
-counties <-sapply (split,
-                   function(x) {x[1]})
 
-counties <-sapply (split,
-                   function(x) {x[2]})
-```
 
