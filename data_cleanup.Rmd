@@ -43,6 +43,18 @@ melanoma_data_cleaned$state  <- states
 
 melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cleaned$state)
 
+melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "data not available"] <- NA
+melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "3 or fewer"] <- 0
+
+#below is final code that changes the column from character to numeric/vector column (auto character as we have text in there)
+
+melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annual_ct)
+
+
+melanoma_data_cleaned$age_adj_inc_rate[melanoma_data_cleaned$age_adj_inc_rate == "data not available"] <- NA
+melanoma_data_cleaned$age_adj_inc_rate <-as.numeric(melanoma_data_cleaned$age_adj_inc_rate)
+
+#number avg annual count/population in the county 
     
 ```
 
