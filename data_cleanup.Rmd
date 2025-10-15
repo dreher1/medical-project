@@ -88,5 +88,15 @@ colnames(county_demographics)[13] <- "white_not_horl_pct"
 
 ```
 
+```{r}
+library(readxl)
+county_population_cleaned <- read_excel("co-est2024-pop (1).xlsx")
+View(county_population_cleaned)
+
+county_population_cleaned <- county_population_cleaned[, -2] 
+
+
+```
+
 
 
