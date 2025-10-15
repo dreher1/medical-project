@@ -23,7 +23,7 @@ colnames(melanoma_data_cleaned)[9] <- "recnet_five_yr_trend"
 colnames(melanoma_data_cleaned)[10] <- "lower_95_ci"
 colnames(melanoma_data_cleaned)[11] <- "upper_95_ci"
 
-    
+#separate the county and state
 library(stringr)
 
 split <- str_split(melanoma_data_cleaned[[1]],", ")
@@ -38,6 +38,7 @@ counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$"
 melanoma_data_cleaned$county <- counties
 melanoma_data_cleaned$state  <- states
 
+#clean up the 6/7 values at the end of the states column
 #Need to look at district of Colombia and where to put that 
 
 melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cleaned$state)
@@ -75,16 +76,5 @@ colnames(county_demographics)[11] <- "two_more_races"
 colnames(county_demographics)[12] <- "white_pct"
 colnames(county_demographics)[13] <- "white_not_horl_pct"
 
-```
-
-```{r}
-library(stringr)
-t <- c("county1,stat1(10)","county2,stat2(1)")
-split <- str_split(t,",")
-counties <-sapply (split,
-                   function(x) {x[1]})
-
-counties <-sapply (split,
-                   function(x) {x[2]})
 ```
 
