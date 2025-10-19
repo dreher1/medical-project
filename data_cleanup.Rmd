@@ -19,7 +19,7 @@ colnames(melanoma_data_cleaned)[5] <- "lower_95_conf"
 colnames(melanoma_data_cleaned)[6] <- "upper_95_conf"
 colnames(melanoma_data_cleaned)[7] <- "avg_annual_ct"
 colnames(melanoma_data_cleaned)[8] <- "recent_trend"
-colnames(melanoma_data_cleaned)[9] <- "recnet_five_yr_trend"
+colnames(melanoma_data_cleaned)[9] <- "recent_five_yr_trend"
 colnames(melanoma_data_cleaned)[10] <- "lower_95_ci"
 colnames(melanoma_data_cleaned)[11] <- "upper_95_ci"
 
@@ -32,6 +32,8 @@ counties <-sapply (split,
 
 states <-sapply (split,
                    function(x) {x[2]})
+
+#in code below may want to delete city and census area 
 
 counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
 
@@ -46,7 +48,7 @@ melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cl
 melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "data not available"] <- NA
 melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "3 or fewer"] <- 0
 
-#below is final code that changes the column from character to numeric/vector column (auto character as we have text in there)
+#below is code that changes the column from character to numeric/vector column (auto character as we have text in there)
 
 melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annual_ct)
 
@@ -83,15 +85,44 @@ colnames(county_demographics)[9] <- "hispanic_or_latino_pct"
 colnames(county_demographics)[10] <- "hawaiian_pacific_islander_pct"
 colnames(county_demographics)[11] <- "two_more_races"
 colnames(county_demographics)[12] <- "white_pct"
-colnames(county_demographics)[13] <- "white_not_horl_pct"
-
+colnames(county_demographics)[13] <- "white_not_h_or_l_pct"
+library(stringr)
+#code below removes county and other things after except city (maybe keep census area also) 
+county_demographics$county_demo <- str_remove(county_demographics$county_demo, "\\s+(County|Parish|Borough|Census Area)$")
 
 ```
 
 ```{r}
+#Is dataset below just 2020-2024 or 2019-2024??
 library(readxl)
-co_est2024_pop_1_ <- read_excel("co-est2024-pop (1).xlsx")
-View(co_est2024_pop_1_)
+county_population <- read_excel("co-est2024-pop (1).xlsx")
+View(county_population)
+colnames(county_population)[1] <- "county_state_pop"
+#removes period in front of each row on column 1 
+library(stringr)
+county_population$county_state_pop <-str_remove(county_population$county_state_pop, "^\\.+\\s*")
+
+
+#code below makes new columns called county and state and removes word county and more
+split <- str_split(county_population[[1]],", ")
+counties <-sapply (split,
+                   function(x) {x[1]})
+
+states <-sapply (split,
+                   function(x) {x[2]})
+
+counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
+
+county_population$county <- counties
+county_population$state  <- states
+
+
+#deletes all of row 1
+county_population<- county_population[-1,]
+
+
+#need to figure out and rename column 2
+
 
 ```
 
