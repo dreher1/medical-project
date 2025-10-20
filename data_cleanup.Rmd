@@ -55,6 +55,8 @@ melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annua
 
 
 #number avg annual count/population in the county 
+
+write.csv(melanoma_data_clenaed, "cleaned_melanoma_table.csv")
     
 ```
 

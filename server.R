@@ -12,15 +12,16 @@
 library(shiny)
 library(markdown)
 library(leaflet)
+library(reactable)
 
 shinyServer(function(input, output, session) {
   
   # Home tab placeholder
   output$home_text <- renderText({
-    "Welcome to the Home tab! You can replace this text or reference a Markdown file for content."
+    "Welcome to the Home tab! Replace this text or reference a Markdown file for content."
   })
   
-  # Visualizations tab placeholder
+  # Visualizations tab placeholder (still base R plot for now—swap with ggplot if you like)
   output$viz_plot <- renderPlot({
     plot(cars, main = "Placeholder Plot: speed vs. dist")
   })
@@ -31,14 +32,40 @@ shinyServer(function(input, output, session) {
   
   # ---- INSERT LEAFLET MAP (SERVER) HERE ----
   output$map <- renderLeaflet({
-    leaflet() |>
-      addTiles() |>
-      setView(lng = -78.86, lat = 37.79, zoom = 12)  # Example: Lexington, VA
+    leaflet(options = leafletOptions(zoomControl = TRUE)) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
   # ------------------------------------------
   
-  # Data Explorer tab placeholder
+  # Data Explorer: interactive table for melanoma_data_cleaned (reactable, not base Shiny tables)
+  output$data_table <- renderReactable({
+    req(exists("melanoma_data_cleaned", where = .GlobalEnv))
+    df <- get("melanoma_data_cleaned", envir = .GlobalEnv)
+    
+    reactable(
+      df,
+      searchable = TRUE,
+      filterable = TRUE,
+      sortable = TRUE,
+      pagination = TRUE,
+      highlight = TRUE,
+      striped = TRUE,
+      bordered = TRUE,
+      resizable = TRUE,
+      defaultPageSize = 10,
+      theme = reactableTheme(
+        borderColor = "#eee",
+        highlightColor = "#f5f5f5"
+      )
+    )
+  })
+  
   output$data_summary <- renderText({
-    "This is where you might summarize your dataset or show descriptive statistics."
+    if (!exists("melanoma_data_cleaned", where = .GlobalEnv)) {
+      return("melanoma_data_cleaned not found in the environment.")
+    }
+    df <- get("melanoma_data_cleaned", envir = .GlobalEnv)
+    paste0("Rows: ", nrow(df), " | Columns: ", ncol(df))
   })
 })

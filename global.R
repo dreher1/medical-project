@@ -1,0 +1,1 @@
+read.csv(cleaned_melanoma_table)
