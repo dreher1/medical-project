@@ -35,11 +35,13 @@ states <-sapply (split,
 
 #in code below may want to delete city and census area 
 
-#edited out code below because honestly making more issues
-#counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
+# might edit out code below because honestly making more issues
+counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
 
 melanoma_data_cleaned$county <- counties
 melanoma_data_cleaned$state  <- states
+
+
 
 #clean up the 6/7 values at the end of the states column
 #Need to look at district of Colombia and where to put that 
@@ -55,9 +57,13 @@ melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annua
 
 
 #number avg annual count/population in the county 
-
-write.csv(melanoma_data_clenaed, "cleaned_melanoma_table.csv")
     
+#Code below removes all rows with Alaska because it is not found in uv_county so want to remove for now 
+
+drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", melanoma_data_cleaned$state, ignore.case = TRUE)
+melanoma_data_cleaned <- melanoma_data_cleaned[!drop_idx, , drop = FALSE]
+
+
 ```
 
 ```{r}
@@ -95,6 +101,14 @@ library(stringr)
 #code below removes county and other things after except city (maybe keep census area also) 
 county_demographics$county_demo <- str_remove(county_demographics$county_demo, "\\s+(County|Parish|Borough|Census Area)$")
 
+#Code below removes all rows with Alaska because it is not found in uv_county so want to remove for now 
+rm_idx <- toupper(county_demographics$state_abr_demo) %in% c("AK", "ALASKA")
+county_demographics <- county_demographics[!rm_idx, , drop = FALSE]
+
+drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", county_demographics$state_abr_demo, ignore.case = TRUE)
+county_demographics <- county_demographics[!drop_idx, , drop = FALSE]
+
+
 ```
 
 ```{r}
@@ -106,6 +120,7 @@ colnames(county_population)[1] <- "county_state_pop"
 #removes period in front of each row on column 1 
 library(stringr)
 county_population$county_state_pop <-str_remove(county_population$county_state_pop, "^\\.+\\s*")
+
 
 
 #code below makes new columns called county and state and removes word county and more
@@ -125,9 +140,17 @@ county_population$state  <- states
 #deletes all of row 1
 county_population<- county_population[-1,]
 
-
 #need to figure out and rename column 2
 
+#Code below removes all rows with Alaska because it is not found in uv_county so want to remove for now 
+drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", county_population$state, ignore.case = TRUE)
+county_population <- county_population[!drop_idx, , drop = FALSE]
+
+#Code below removes row that is no data and useless
+target <- "Annual Estimates of the Resident Population for Counties in the United States: April 1, 2020 to July 1, 2024 (CO-EST2024-POP)"
+idx <- which(trimws(county_population$county_state_pop) == target)
+county_population <- county_population[-idx, , drop = FALSE]
+row.names(county_population) <- NULL
 
 ```
 
