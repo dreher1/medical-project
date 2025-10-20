@@ -35,7 +35,8 @@ states <-sapply (split,
 
 #in code below may want to delete city and census area 
 
-counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
+#edited out code below because honestly making more issues
+#counties <- str_remove(counties, "\\s+(County|Parish|City|Borough|Census Area)$")
 
 melanoma_data_cleaned$county <- counties
 melanoma_data_cleaned$state  <- states
@@ -66,6 +67,8 @@ colnames(uv_county)[2] <- "state_abr"
 colnames(uv_county)[3] <- "fips_uv"
 colnames(uv_county)[4] <- "county_name"
 colnames(uv_county)[5] <- "uv_whm2"
+
+#lacks 
 ```
 
 
