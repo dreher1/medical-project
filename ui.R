@@ -8,6 +8,7 @@ library(shiny)
 library(markdown)
 library(leaflet)
 
+
 shinyUI(
   navbarPage(
     title = "Example NavBar App",
@@ -46,3 +47,9 @@ shinyUI(
     )
   )
 )
+
+fluidPage(
+  leafletOutput("map", width = "100%", height = 600)
+)
+
+
