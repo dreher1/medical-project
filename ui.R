@@ -1,24 +1,18 @@
-# library(shiny)
-# library(leaflet)
-# 
-# fluidPage(
-#   leafletOutput("map", width = "100%", height = 600)
-# )
 library(shiny)
 library(markdown)
 library(leaflet)
 library(reactable)
 
-# Define custom royal blue theme colors
-royal_blue <- "#4169E1"   # main royal blue
-light_blue <- "#E8F0FF"   # very light background tone
-dark_blue  <- "#1E3A8A"   # darker navy accent
+# Define custom colors taken from an online template
+royal_blue <- "#4169E1" 
+light_blue <- "#E8F0FF" 
+dark_blue  <- "#1E3A8A"
 
 
 #state dropdown choices (includes DC)
 state_choices <- c("All states (USA)", sort(c(state.name, "District of Columbia")))
 
-
+#create the user interface establishment
 shinyUI(
   navbarPage(
     title = "BIOL-185 Project - Melanoma Case Studies",
@@ -54,7 +48,7 @@ shinyUI(
       }
     "))),
     
-    # ---- Home Tab ----
+    # home tab
     tabPanel(
       "Home",
       fluidPage(
@@ -64,15 +58,14 @@ shinyUI(
       )
     ),
     
-    # ---- Visualizations Tab ----
+    # Visualizations tab
     tabPanel(
       "Visualizations",
       fluidPage(
         h2("Visualizations"),
-        
-        # Interactive Map
         h3("Interactive Map"),
-        #ADDED: dropdown under Visualizations to focus the map
+        
+        # State dropdown
         selectInput(
           inputId = "state_select",
           label   = "Focus state:",
@@ -80,11 +73,24 @@ shinyUI(
           selected = "All states (USA)",
           width = "300px"
         ),
+        
+        #check boxes
+        checkboxGroupInput(
+          inputId = "viz_options",
+          label   = "Show data layers:",
+          choices = c(
+            "Melanoma by County",
+            "Race",
+            "UV Measurement (wmh2)"
+          ),
+          selected = character(0)   
+        ),
+        
         leafletOutput("map", height = "400px")
       )
     ),
     
-    # ---- Data Explorer Tab ----
+    # Data Explorer tab
     tabPanel(
       "Data Explorer",
       fluidPage(

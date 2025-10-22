@@ -15,7 +15,7 @@ shinyServer(function(input, output, session) {
     "Welcome to the Home tab! Replace this text or reference a Markdown file for content."
   })
   
-  # Visualizations
+  # Visualizations (placeholders)
   output$viz_plot <- renderPlot({
     plot(cars, main = "Placeholder Plot: speed vs. dist")
   })
@@ -29,6 +29,7 @@ shinyServer(function(input, output, session) {
       setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
   
+
   #chatgpt code
   states_sf <- tigris::states(cb = TRUE, year = 2023) |> sf::st_transform(4326)
   keep_names <- c(state.name, "District of Columbia", "Puerto Rico")
@@ -77,12 +78,17 @@ shinyServer(function(input, output, session) {
       fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], #added
                 lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])  #added
   }, ignoreInit = TRUE) #added
+
+  # Optional: watch checkbox selections (use to add/remove Leaflet layers later)
+  observeEvent(input$viz_options, ignoreInit = TRUE, {
+    message("Selected layers: ", paste(input$viz_options, collapse = ", "))
+  })
+
   
   # ---- Data Explorer ----
   output$data_table <- renderReactable({
-    # Safely fetch from global.R
     df <- get0("melanoma_table", inherits = TRUE)
-    req(!is.null(df))  # shows nothing until available
+    req(!is.null(df))
     
     reactable(
       df,
