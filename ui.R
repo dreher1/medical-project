@@ -14,6 +14,11 @@ royal_blue <- "#4169E1"   # main royal blue
 light_blue <- "#E8F0FF"   # very light background tone
 dark_blue  <- "#1E3A8A"   # darker navy accent
 
+
+#state dropdown choices (includes DC & PR)
+state_choices <- c("All states (USA)", sort(c(state.name, "District of Columbia")))
+
+
 shinyUI(
   navbarPage(
     title = "BIOL-185 Project - Melanoma Case Studies",
@@ -67,6 +72,14 @@ shinyUI(
         
         # Interactive Map
         h3("Interactive Map"),
+        #ADDED: dropdown under Visualizations to focus the map
+        selectInput(
+          inputId = "state_select",
+          label   = "Focus state:",
+          choices = state_choices,
+          selected = "All states (USA)",
+          width = "300px"
+        ),
         leafletOutput("map", height = "400px")
       )
     ),
