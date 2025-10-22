@@ -8,7 +8,8 @@ royal_blue <- "#4169E1"
 light_blue <- "#E8F0FF" 
 dark_blue  <- "#1E3A8A"
 
-# create the state dropdown choices (includes DC)
+
+#state dropdown choices (includes DC)
 state_choices <- c("All states (USA)", sort(c(state.name, "District of Columbia")))
 
 #create the user interface establishment
