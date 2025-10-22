@@ -97,7 +97,7 @@ shinyUI(
         p("Explore the melanoma_table interactively:"),
         reactableOutput("data_table", height = 500),
         br(),
-        textOutput("data_summary")
+        textOutput("data_summary") 
       )
     )
   )
