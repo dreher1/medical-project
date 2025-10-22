@@ -1,0 +1,1 @@
+melanoma_table <- read.csv("cleaned_melanoma_table.csv", stringsAsFactors = FALSE)
