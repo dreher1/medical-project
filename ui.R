@@ -15,7 +15,7 @@ light_blue <- "#E8F0FF"   # very light background tone
 dark_blue  <- "#1E3A8A"   # darker navy accent
 
 
-#state dropdown choices (includes DC & PR)
+#state dropdown choices (includes DC)
 state_choices <- c("All states (USA)", sort(c(state.name, "District of Columbia")))
 
 
