@@ -74,9 +74,6 @@ shinyServer(function(input, output, session) {
     
     counties_with_data <- counties_with_data[!is.na(counties_with_data$avg_annual_ct), ]
     
-    if (nrow(counties_with_data) == 0) {
-      return(invisible())
-    }
     
     # Create color palette
     pal <- colorBin(
