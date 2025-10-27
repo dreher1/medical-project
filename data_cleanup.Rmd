@@ -63,7 +63,9 @@ melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annua
 drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", melanoma_data_cleaned$state, ignore.case = TRUE)
 melanoma_data_cleaned <- melanoma_data_cleaned[!drop_idx, , drop = FALSE]
 
+
 write.csv(melanoma_data_cleaned, "cleaned_melanoma_table.csv")
+#what does code above
 
 ```
 
