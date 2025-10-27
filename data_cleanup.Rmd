@@ -42,7 +42,6 @@ melanoma_data_cleaned$county <- counties
 melanoma_data_cleaned$state  <- states
 
 
-
 #clean up the 6/7 values at the end of the states column
 #Need to look at district of Colombia and where to put that 
 
@@ -55,6 +54,8 @@ melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "3 or
 
 melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annual_ct)
 
+#Bedford GeoID wrong 
+melanoma_data_cleaned[723,2] <-"51019"
 
 #number avg annual count/population in the county 
     
@@ -64,8 +65,10 @@ drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", melanoma_data_cleaned$state, ignore.c
 melanoma_data_cleaned <- melanoma_data_cleaned[!drop_idx, , drop = FALSE]
 
 
+
 write.csv(melanoma_data_cleaned, "cleaned_melanoma_table.csv")
-#what does code above
+
+
 
 ```
 

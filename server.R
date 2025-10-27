@@ -41,7 +41,6 @@ shinyServer(function(input, output, session) {
   draw_melanoma <- function(state_name) {
     proxy <- leafletProxy("map")
     
-    # Clear old melanoma layer
     proxy %>% clearGroup("melanoma") %>% removeControl("melanoma_legend")
     
     # Only draw if checkbox is checked AND state is selected
