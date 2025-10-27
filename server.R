@@ -84,7 +84,7 @@ shinyServer(function(input, output, session) {
     )
     
     # Draw the choropleth
-    proxy %>% 
+    proxy %>%
       addPolygons(
         data = counties_with_data,
         fillColor = ~pal(avg_annual_ct),
@@ -118,9 +118,9 @@ shinyServer(function(input, output, session) {
     proxy <- leafletProxy("map")
     
     # Clear everything when state changes
-    proxy %>% 
-      clearGroup("state_focus") %>% 
-      clearGroup("melanoma") %>% 
+    proxy %>%
+      clearGroup("state_focus") %>%
+      clearGroup("melanoma") %>%
       removeControl("melanoma_legend")
     
     # Handle "All states" selection
