@@ -96,7 +96,7 @@ shinyServer(function(input, output, session) {
         label = ~paste0(NAME, " County: ", avg_annual_ct, " cases/year"),
         highlightOptions = highlightOptions(
           weight = 2,
-          color = "#666",
+          color = "#665",
           fillOpacity = 0.9,
           bringToFront = TRUE
         )
