@@ -27,67 +27,122 @@ shinyServer(function(input, output, session) {
       setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
   
-  # ONE OBSERVE - handles everything
+  # SINGLE OBSERVER - monitors both state_select and viz_options
   observe({
-    req(input$state_select)
     
-    proxy <- leafletProxy("map")
-    proxy %>% clearGroup("state_focus") %>% clearGroup("melanoma") %>% clearGroup("uv")
+    map_proxy <- leafletProxy("map")
     
+    # Clear all layers
+    map_proxy %>% 
+      clearGroup("state_focus") %>%
+      clearGroup("countyPolygons") %>%
+      removeControl("melanoma_legend")
+    
+    # Handle "All states (USA)" selection
     if (input$state_select == "All states (USA)") {
-      proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
-    } else {
-      sel <- states_sf[states_sf$NAME == input$state_select, ]
-      if (nrow(sel) > 0) {
-        bb <- sf::st_bbox(sel)
-        proxy %>%
-          addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, opacity = 1, group = "state_focus") %>%
-          fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
+      map_proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
+      
+      # Show notification if checkbox is checked
+      if ("Melanoma by County" %in% input$viz_options) {
+        showNotification(
+          "Please select a specific state to view melanoma data",
+          type = "warning",
+          duration = 3
+        )
       }
       
-      state_abbr <- state.abb[match(input$state_select, state.name)]
-      if (is.na(state_abbr) && input$state_select == "District of Columbia") state_abbr <- "DC"
+      return(invisible())
+    }
+    
+    # Draw state outline and zoom to it
+    sel <- states_sf[states_sf$NAME == input$state_select, ]
+    if (nrow(sel) > 0) {
+      bb <- sf::st_bbox(sel)
+      map_proxy %>%
+        addPolygons(
+          data = sel,
+          fill = FALSE,
+          color = "#4169E1",
+          weight = 2,
+          opacity = 1,
+          group = "state_focus"
+        ) %>%
+        fitBounds(
+          lng1 = bb[["xmin"]], 
+          lat1 = bb[["ymin"]],
+          lng2 = bb[["xmax"]], 
+          lat2 = bb[["ymax"]]
+        )
+    }
+    
+    # Check if melanoma checkbox is checked
+    if ("Melanoma by County" %in% input$viz_options) {
       
+      # Get state abbreviation
+      state_abbr <- state.abb[match(input$state_select, state.name)]
+      if (is.na(state_abbr) && input$state_select == "District of Columbia") {
+        state_abbr <- "DC"
+      }
+      
+      # Filter counties for selected state
       state_counties <- counties_sf[counties_sf$STUSPS == state_abbr, ]
       
-      if ("Melanoma by County" %in% input$viz_options) {
-        counties_melanoma <- state_counties %>%
-          left_join(melanoma_table[, c("fips_melanoma", "avg_annual_ct")], by = c("GEOID" = "fips_melanoma")) %>%
-          filter(!is.na(avg_annual_ct))
-        
-        if (nrow(counties_melanoma) > 0) {
-          pal <- colorBin(palette = "YlOrRd", domain = counties_melanoma$avg_annual_ct, 
-                          bins = c(0, 10, 25, 50, 100, 250, 500, Inf))
-          
-          proxy %>%
-            addPolygons(data = counties_melanoma, fillColor = ~pal(avg_annual_ct), weight = 1,
-                        color = "white", fillOpacity = 0.7, group = "melanoma",
-                        label = ~paste0(NAME, ": ", avg_annual_ct, " cases/year"))
-        }
-      }
+      # Join with melanoma data
+      counties_with_data <- state_counties %>%
+        left_join(
+          melanoma_table[, c("fips_melanoma", "county", "state", "avg_annual_ct")],
+          by = c("GEOID" = "fips_melanoma")
+        ) %>%
+        filter(!is.na(avg_annual_ct))
       
-      if ("UV Measurement (wmh2)" %in% input$viz_options) {
-        counties_uv <- state_counties %>%
-          left_join(uv_table[, c("fips_uv", "uv_value", "uv_category")], by = c("GEOID" = "fips_uv")) %>%
-          filter(!is.na(uv_value))
-        
-        if (nrow(counties_uv) > 0) {
-          for (i in 1:nrow(counties_uv)) {
-            county <- counties_uv[i, ]
-            dash <- if (is.na(county$uv_category)) "0" else if (county$uv_category == "low") "10,10" else if (county$uv_category == "medium") "5,5" else "2,2"
-            proxy %>% addPolygons(data = county, fillColor = "transparent", weight = 3, color = "#FF6B00",
-                                  dashArray = dash, fillOpacity = 0, group = "uv",
-                                  label = paste0(county$NAME, ": UV ", round(county$uv_value, 1)) %>% lapply(htmltools::HTML))
-          }
-        }
-      }
+      # Create color palette
+      pal <- colorBin(
+        palette = "YlOrRd",
+        domain = counties_with_data$avg_annual_ct,
+        bins = c(0, 10, 25, 50, 100, 250, 500, Inf),
+        na.color = "#808080"
+      )
+      
+      # Add county polygons
+      map_proxy %>%
+        addPolygons(
+          data = counties_with_data,
+          fillColor = ~pal(avg_annual_ct),
+          weight = 1,
+          opacity = 1,
+          color = "white",
+          layerId = ~GEOID,
+          fillOpacity = 0.7,
+          group = "countyPolygons",
+          label = ~paste0(NAME, " County: ", avg_annual_ct, " cases/year"),
+          highlightOptions = highlightOptions(
+            weight = 2,
+            color = "#666",
+            fillOpacity = 0.9,
+            bringToFront = TRUE
+          )
+        ) %>%
+        addLegend(
+          position = "bottomright",
+          pal = pal,
+          values = counties_with_data$avg_annual_ct,
+          title = "Annual<br>Melanoma Cases<br>(County Level)",
+          opacity = 0.7,
+          layerId = "melanoma_legend"
+        )
     }
   })
   
   output$data_table <- renderReactable({
     req(melanoma_table)
-    reactable(melanoma_table, searchable = TRUE, filterable = TRUE, sortable = TRUE, 
-              pagination = TRUE, defaultPageSize = 10)
+    reactable(
+      melanoma_table,
+      searchable = TRUE,
+      filterable = TRUE,
+      sortable = TRUE,
+      pagination = TRUE,
+      defaultPageSize = 10
+    )
   })
   
   output$data_summary <- renderText({
