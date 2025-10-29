@@ -68,17 +68,29 @@ shinyServer(function(input, output, session) {
       
       if ("UV Measurement (wmh2)" %in% input$viz_options) {
         counties_uv <- state_counties %>%
-          left_join(uv_table[, c("fips_uv", "uv_value", "uv_category")], by = c("GEOID" = "fips_uv")) %>%
+          left_join(uv_table %>% mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>% select(fips_uv, uv_value), by = c("GEOID" = "fips_uv")) %>%
           filter(!is.na(uv_value))
         
         if (nrow(counties_uv) > 0) {
-          for (i in 1:nrow(counties_uv)) {
-            county <- counties_uv[i, ]
-            dash <- if (is.na(county$uv_category)) "0" else if (county$uv_category == "low") "10,10" else if (county$uv_category == "medium") "5,5" else "2,2"
-            proxy %>% addPolygons(data = county, fillColor = "transparent", weight = 3, color = "#FF6B00",
-                                  dashArray = dash, fillOpacity = 0, group = "uv",
-                                  label = paste0(county$NAME, ": UV ", round(county$uv_value, 1)) %>% lapply(htmltools::HTML))
-          }
+          # Bin UV into categories right here
+          counties_uv$uv_category <- cut(
+            counties_uv$uv_value,
+            breaks = c(0, 4200, 4800, Inf),
+            labels = c("low", "medium", "high")
+          )
+          
+          pal_uv <- colorBin(palette = "Blues", domain = counties_uv$uv_value, bins = c(0, 4200, 4800, Inf))
+          
+          proxy %>%
+            addPolygons(
+              data = counties_uv,
+              fillColor = ~pal_uv(uv_value),
+              weight = 1,
+              color = "blue",
+              fillOpacity = 0.3,
+              group = "uv",
+              label = ~paste0(NAME, ": UV ", round(uv_value, 1))
+            )
         }
       }
     }
