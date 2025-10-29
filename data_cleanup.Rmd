@@ -82,6 +82,8 @@ colnames(uv_county)[3] <- "fips_uv"
 colnames(uv_county)[4] <- "county_name"
 colnames(uv_county)[5] <- "uv_whm2"
 
+write.csv(uv_county, "cleaned_uv_table.csv", row.names = FALSE)
+
 #lacks county and city name. Essentially need to add to each state by state
 #Match by state and first word of county for leaflet!!!
 ```

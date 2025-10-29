@@ -6,6 +6,7 @@ library(reactable)
 library(sf)
 library(tigris)
 library(dplyr)
+library(readxl)
 
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
@@ -29,3 +30,10 @@ states_sf <- tigris::states(cb = TRUE, year = 2023) |>
   sf::st_transform(4326)
 keep_names <- setdiff(state.name, "Alaska")
 states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia"), ]
+
+
+uv_table <- read.csv("cleaned_uv_table.csv", stringsAsFactors = FALSE)
+uv_table$state_uv <- trimws(uv_table$state_uv)
+#uv_table$fips_uv <- sprintf("%05d", as.numeric(uv_table$fips_uv))
+uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
+View(uv_table)
