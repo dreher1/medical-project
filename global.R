@@ -37,3 +37,9 @@ uv_table$state_uv <- trimws(uv_table$state_uv)
 #uv_table$fips_uv <- sprintf("%05d", as.numeric(uv_table$fips_uv))
 uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
 View(uv_table)
+
+
+#Code to load population dataset 
+county_population <- read_excel("co-est2024-pop (1).xlsx")
+colnames(county_population)[1] <- "county_state_pop"
+county_population$county_state_pop <- str_remove(county_population$county_state_pop, "^\\.+\\s*")

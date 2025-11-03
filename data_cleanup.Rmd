@@ -48,6 +48,7 @@ melanoma_data_cleaned$state  <- states
 melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cleaned$state)
 
 melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "data not available"] <- NA
+#Had to do this to make column numeric 
 melanoma_data_cleaned$avg_annual_ct[melanoma_data_cleaned$avg_annual_ct == "3 or fewer"] <- 0
 
 #below is code that changes the column from character to numeric/vector column (auto character as we have text in there)
@@ -57,7 +58,14 @@ melanoma_data_cleaned$avg_annual_ct <-as.numeric(melanoma_data_cleaned$avg_annua
 #Bedford GeoID wrong 
 melanoma_data_cleaned[723,2] <-"51019"
 
-#number avg annual count/population in the county 
+# Handle suppressed data in age_adj_inc_rate
+# First convert "*" to NA so it doesn't cause errors when converting to numeric
+melanoma_data_cleaned$age_adj_inc_rate[melanoma_data_cleaned$age_adj_inc_rate == "*"] <- NA
+melanoma_data_cleaned$age_adj_inc_rate[melanoma_data_cleaned$age_adj_inc_rate == "data not available"] <- NA
+
+# Convert to numeric
+melanoma_data_cleaned$age_adj_inc_rate <- as.numeric(melanoma_data_cleaned$age_adj_inc_rate)
+
     
 #Code below removes all rows with Alaska because it is not found in uv_county so want to remove for now 
 

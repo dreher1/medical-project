@@ -75,15 +75,17 @@ shinyUI(
         ),
         
         #check boxes
-        checkboxGroupInput(
-          inputId = "viz_options",
+        radioButtons(
+          inputId = "melanoma_view",  # Changed from "viz_options"
           label   = "Show data layers:",
           choices = c(
-            "Melanoma by County",
-            "UV Measurement (wmh2)",
-            "UV vs Melanoma correlation"
+            "None" = "none",
+            "Melanoma by County" = "count",  # Keep your title, add value
+            "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
+            "UV Measurement (wmh2)" = "uv",
+            "UV vs Melanoma correlation" = "correlation"
           ),
-          selected = character(0)   
+          selected = "none"   
         ),
         
         leafletOutput("map", height = "400px")
