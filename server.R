@@ -27,22 +27,24 @@ shinyServer(function(input, output, session) {
       setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
   
+  
+  
+  
+  #main code block 
   # SINGLE OBSERVER - monitors both state_select and viz_options
   observe({
     
-    map_proxy <- leafletProxy("map")
+    proxy <- leafletProxy("map")
     
     # Clear all layers
-    map_proxy %>% 
+    proxy %>% 
       clearGroup("state_focus") %>%
       clearGroup("countyPolygons") %>%
       removeControl("melanoma_legend")
-    
-    # Handle "All states (USA)" selection
     if (input$state_select == "All states (USA)") {
-      map_proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
+      proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
       
-      # Show notification if checkbox is checked
+      # Show notification if user tries to check melanoma without selecting a state
       if ("Melanoma by County" %in% input$viz_options) {
         showNotification(
           "Please select a specific state to view melanoma data",
@@ -51,33 +53,17 @@ shinyServer(function(input, output, session) {
         )
       }
       
-      
+    } else {
+      sel <- states_sf[states_sf$NAME == input$state_select, ]
+      if (nrow(sel) > 0) {
+        bb <- sf::st_bbox(sel)
+        proxy %>%
+          addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, opacity = 1, group = "state_focus") %>%
+          fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
+      }
     }
     
-    # Draw state outline and zoom to it
-    sel <- states_sf[states_sf$NAME == input$state_select, ]
-    if (nrow(sel) > 0) {
-      bb <- sf::st_bbox(sel)
-      map_proxy %>%
-        addPolygons(
-          data = sel,
-          fill = FALSE,
-          color = "#4169E1",
-          weight = 2,
-          opacity = 1,
-          group = "state_focus"
-        ) %>%
-        fitBounds(
-          lng1 = bb[["xmin"]], 
-          lat1 = bb[["ymin"]],
-          lng2 = bb[["xmax"]], 
-          lat2 = bb[["ymax"]]
-        )
-    }
     
-    # Check if melanoma checkbox is checked
-    if ("Melanoma by County" %in% input$viz_options) {
-      
       # Get state abbreviation
       state_abbr <- state.abb[match(input$state_select, state.name)]
       if (is.na(state_abbr) && input$state_select == "District of Columbia") {
@@ -87,6 +73,9 @@ shinyServer(function(input, output, session) {
       # Filter counties for selected state
       state_counties <- counties_sf[counties_sf$STUSPS == state_abbr, ]
       
+    # Check if melanoma checkbox is checked
+    if ("Melanoma by County" %in% input$viz_options) {
+      
       # Join with melanoma data
       counties_with_data <- state_counties %>%
         left_join(
@@ -94,7 +83,7 @@ shinyServer(function(input, output, session) {
           by = c("GEOID" = "fips_melanoma")
         ) %>%
         filter(!is.na(avg_annual_ct))
-      
+     
       # Create color palette
       pal <- colorBin(
         palette = "YlOrRd",
@@ -104,7 +93,7 @@ shinyServer(function(input, output, session) {
       )
       
       # Add county polygons
-      map_proxy %>%
+      proxy %>%
         addPolygons(
           data = counties_with_data,
           fillColor = ~pal(avg_annual_ct),
@@ -131,33 +120,36 @@ shinyServer(function(input, output, session) {
           layerId = "melanoma_legend"
         )
     }
-    if ("UV Measurement (wmh2)" %in% input$viz_options) {
-      counties_uv <- state_counties %>%
-        left_join(uv_table %>% mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>% select(fips_uv, uv_value), by = c("GEOID" = "fips_uv")) %>%
-        filter(!is.na(uv_value))
+   
       
-      if (nrow(counties_uv) > 0) {
-        # Bin UV into categories right here
-        counties_uv$uv_category <- cut(
-          counties_uv$uv_value,
-          breaks = c(0, 4200, 4800, Inf),
-          labels = c("low", "medium", "high")
-        )
-        
-        pal_uv <- colorBin(palette = "Blues", domain = counties_uv$uv_value, bins = c(0, 4200, 4800, Inf))
-        
-        proxy %>%
-          addPolygons(
-            data = counties_uv,
-            fillColor = ~pal_uv(uv_value),
-            weight = 1,
-            color = "blue",
-            fillOpacity = 0.3,
-            group = "uv",
-            label = ~paste0(NAME, ": UV ", round(uv_value, 1))
-          )
-      }
-    }
+      
+   # if ("UV Measurement (wmh2)" %in% input$viz_options) {
+   #    counties_uv <- state_counties %>%
+   #      left_join(uv_table %>% mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>% select(fips_uv, uv_value), by = c("GEOID" = "fips_uv")) %>%
+   #      filter(!is.na(uv_value))
+   # 
+   #    if (nrow(counties_uv) > 0) {
+   #      # Bin UV into categories right here
+   #      counties_uv$uv_category <- cut(
+   #        counties_uv$uv_value,
+   #        breaks = c(0, 4200, 4800, Inf),
+   #        labels = c("low", "medium", "high")
+   #      )
+   # 
+   #      pal_uv <- colorBin(palette = "Blues", domain = counties_uv$uv_value, bins = c(0, 4200, 4800, Inf))
+   # 
+   #      proxy %>%
+   #        addPolygons(
+   #          data = counties_uv,
+   #          fillColor = ~pal_uv(uv_value),
+   #          weight = 1,
+   #          color = "blue",
+   #          fillOpacity = 0.3,
+   #          group = "uv",
+   #          label = ~paste0(NAME, ": UV ", round(uv_value, 1))
+   #        )
+   #    }
+   #  }
   })
   
   output$data_table <- renderReactable({
