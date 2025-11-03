@@ -117,7 +117,7 @@ shinyServer(function(input, output, session) {
           label = ~paste0(NAME, " County: ", avg_annual_ct, " cases/year"),
           highlightOptions = highlightOptions(
             weight = 2,
-            color = "#666",
+            color = "#665",
             fillOpacity = 0.9,
             bringToFront = TRUE
           )
@@ -130,6 +130,33 @@ shinyServer(function(input, output, session) {
           opacity = 0.7,
           layerId = "melanoma_legend"
         )
+    }
+    if ("UV Measurement (wmh2)" %in% input$viz_options) {
+      counties_uv <- state_counties %>%
+        left_join(uv_table %>% mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>% select(fips_uv, uv_value), by = c("GEOID" = "fips_uv")) %>%
+        filter(!is.na(uv_value))
+      
+      if (nrow(counties_uv) > 0) {
+        # Bin UV into categories right here
+        counties_uv$uv_category <- cut(
+          counties_uv$uv_value,
+          breaks = c(0, 4200, 4800, Inf),
+          labels = c("low", "medium", "high")
+        )
+        
+        pal_uv <- colorBin(palette = "Blues", domain = counties_uv$uv_value, bins = c(0, 4200, 4800, Inf))
+        
+        proxy %>%
+          addPolygons(
+            data = counties_uv,
+            fillColor = ~pal_uv(uv_value),
+            weight = 1,
+            color = "blue",
+            fillOpacity = 0.3,
+            group = "uv",
+            label = ~paste0(NAME, ": UV ", round(uv_value, 1))
+          )
+      }
     }
   })
   
