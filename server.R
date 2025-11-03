@@ -9,8 +9,42 @@ options(tigris_use_cache = TRUE, tigris_class = "sf")
 
 shinyServer(function(input, output, session) {
   
-  output$home_text <- renderText({
-    "Welcome to the Home tab!"
+  output$home_text <- renderUI({
+    HTML("Welcome to our BIO-185 project on data visualization for Melanoma cases in the United States.
+  <br><br>
+         <strong><span style='font-size: 24px;'>Overview</span></strong><br><br>
+         Below are four examples of invasive melanoma, and an overview of the general development process from the epidermal region of the skin to the fourth stage, which is complete invasion and spread to other organs of the body. The data in this project comes from the NCI (National Cancer Institute) in conjunction with the CDC (CDC.gov).")
+  })
+  
+  output$home_melanoma <- renderUI({
+    tags$div(
+      style = "display: flex; justify-content: center; align-items: center; gap: 40px; margin: 20px auto;",
+      tags$img(src = "cs-Accuracy-Dermoscopic-Criteria-Diagnosis-Melanoma-Situ-600x400.jpg", 
+               width = "300px"),
+      tags$img(src = "melanoma-stages.jpeg", 
+               width = "300px")
+    )
+  })
+  
+  output$home_image <- renderUI({
+    tags$div(
+      style = "display: flex; justify-content: center; align-items: center; gap: 40px; margin: 20px auto;",
+      tags$img(src = "National_Cancer_Institute_logo.svg.png", 
+               width = "300px"),
+      tags$img(src = "CDC_logo.png", 
+               width = "300px")
+    )
+  })
+  
+  output$home_text2 <- renderUI({
+    HTML("<strong><span style='font-size: 24px;'>Available Visualizations</span></strong><br><br>
+    On this website, you can view and visualize the following data:
+  <br><br>
+  <strong>Melanoma Cases by County:</strong> This visualization is created from data collected by the National Cancer Institute. It contains the number of cases (average annual count from the years 2017-2021) for each county. The data is collected on a per-county basis.
+  <br><br>
+  <strong>Melanoma Rate (Age-Adjusted per 100k):</strong> This visualization shows the number of cases (per 100,000) (age adjusted per the NCI website). The data is also included in the original dataset provided by the NCI. The data is collected on a per-county basis.<br><br>
+  <strong>UV Measurement:</strong> This is another choropleth map that shows the intensity of UV (in Watts per square meter) for each county in the choropleth map. The data is taken from the National Institute for Cancer GIS Portal for Patient Research, and contains the average values for intensity from the years 2020-2024.
+  <br><br>To view the data, visit the Visualizations tab in the menu bar.")
   })
   
   output$viz_plot <- renderPlot({
