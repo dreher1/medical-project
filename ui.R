@@ -85,7 +85,7 @@ shinyUI(
             "Melanoma by County" = "count",  # Keep your title, add value
             "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
             "UV Measurement (wmh2)" = "uv",
-            "UV vs Melanoma correlation" = "correlation"
+            "UV vs Melanoma Rate correlation" = "correlation"
           ),
           selected = "none"   
         ),
