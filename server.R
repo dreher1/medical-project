@@ -39,7 +39,7 @@ shinyServer(function(input, output, session) {
     # Clear all layers
     proxy %>% 
       clearGroup("state_focus") %>%
-      clearGroup("countyPolygons") %>%
+      clearGroup("melanoma") %>%
       removeControl("melanoma_legend")
     if (input$state_select == "All states (USA)") {
       proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
@@ -102,7 +102,7 @@ shinyServer(function(input, output, session) {
           color = "white",
           layerId = ~GEOID,
           fillOpacity = 0.7,
-          group = "countyPolygons",
+          group = "melanoma",
           label = ~paste0(NAME, " County: ", avg_annual_ct, " cases/year"),
           highlightOptions = highlightOptions(
             weight = 2,
@@ -121,7 +121,7 @@ shinyServer(function(input, output, session) {
         )
     }
    
-      
+    
       
    # if ("UV Measurement (wmh2)" %in% input$viz_options) {
    #    counties_uv <- state_counties %>%
