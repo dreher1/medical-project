@@ -82,8 +82,8 @@ shinyUI(
           label   = "Show data layers:",
           choices = c(
             "Melanoma by County",
-            "Race",
-            "UV Measurement (wmh2)"
+            "UV Measurement (wmh2)",
+            "UV vs Melanoma correlation"
           ),
           selected = character(0)   
         ),
