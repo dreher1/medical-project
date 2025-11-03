@@ -53,8 +53,10 @@ shinyUI(
       "Home",
       fluidPage(
         h2("Home"),
-        includeMarkdown("home.md"),
-        textOutput("home_text")
+        uiOutput("home_text"),
+        uiOutput("home_melanoma"),
+        uiOutput("home_image"),
+        uiOutput("home_text2")
       )
     ),
     
