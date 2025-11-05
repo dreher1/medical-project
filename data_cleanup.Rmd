@@ -43,7 +43,7 @@ melanoma_data_cleaned$state  <- states
 
 
 #clean up the 6/7 values at the end of the states column
-#Need to look at district of Colombia and where to put that 
+#Need to look at how district of Colombia and where to put that 
 
 melanoma_data_cleaned$state <- gsub("\\s*\\((6|7)\\)\\s*", " ", melanoma_data_cleaned$state)
 
@@ -69,8 +69,8 @@ melanoma_data_cleaned$age_adj_inc_rate <- as.numeric(melanoma_data_cleaned$age_a
     
 #Code below removes all rows with Alaska because it is not found in uv_county so want to remove for now 
 
-drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", melanoma_data_cleaned$state, ignore.case = TRUE)
-melanoma_data_cleaned <- melanoma_data_cleaned[!drop_idx, , drop = FALSE]
+# drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", melanoma_data_cleaned$state, ignore.case = TRUE)
+# melanoma_data_cleaned <- melanoma_data_cleaned[!drop_idx, , drop = FALSE]
 
 
 
