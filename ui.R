@@ -90,7 +90,8 @@ shinyUI(
           selected = "none"   
         ),
         
-        leafletOutput("map", height = "400px")
+        leafletOutput("map", height = "400px"),
+        uiOutput("viz_explanation")
       )
     ),
     
