@@ -207,35 +207,59 @@ shinyServer(function(input, output, session) {
           )
       }
       
-    }  # Close else block
+      
+      if (input$melanoma_view == "uv") {
+        
+        counties_with_data <- state_counties %>%
+          left_join(
+            uv_table %>% 
+              mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>%
+              select(fips_uv, uv_value),
+            by = c("GEOID" = "fips_uv")
+          )
+        
+        pal <- colorBin(
+          palette = c("#FFFFCC", "#FFEDA0", "#FED976", "#FEB24C", "#FD8D3C", 
+                      "#FC4E2A", "#E31A1C", "#BD0026", "#800026", "#67001F", "#4D0015", "#33000D"),
+          domain = counties_with_data$uv_value,
+          bins = c(0, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000, 5200, 5400, 5700, Inf),
+          na.color = "#F0F0F0"
+        )
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = ~pal(uv_value),
+            weight = 1,
+            opacity = 1,
+            color = "white",
+            layerId = ~GEOID,
+            fillOpacity = 0.7,
+            group = "melanoma",
+            label = ~ifelse(
+              is.na(uv_value),
+              paste0(NAME, " County: No UV data available"),
+              paste0(NAME, " County: ", round(uv_value, 1), " W/m²")
+            ),
+            highlightOptions = highlightOptions(
+              weight = 2,
+              color = "#665",
+              fillOpacity = 0.9,
+              bringToFront = TRUE
+            )
+          ) %>%
+          addLegend(
+            position = "bottomright",
+            pal = pal,
+            values = counties_with_data$uv_value,
+            title = "UV Intensity<br>(W/m²)",
+            opacity = 0.7,
+            layerId = "melanoma_legend"
+          )
+      }
+      
+    }
     
-    # if ("UV Measurement (wmh2)" %in% input$viz_options) {
-    #    counties_uv <- state_counties %>%
-    #      left_join(uv_table %>% mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>% select(fips_uv, uv_value), by = c("GEOID" = "fips_uv")) %>%
-    #      filter(!is.na(uv_value))
-    # 
-    #    if (nrow(counties_uv) > 0) {
-    #      # Bin UV into categories right here
-    #      counties_uv$uv_category <- cut(
-    #        counties_uv$uv_value,
-    #        breaks = c(0, 4200, 4800, Inf),
-    #        labels = c("low", "medium", "high")
-    #      )
-    # 
-    #      pal_uv <- colorBin(palette = "Blues", domain = counties_uv$uv_value, bins = c(0, 4200, 4800, Inf))
-    # 
-    #      proxy %>%
-    #        addPolygons(
-    #          data = counties_uv,
-    #          fillColor = ~pal_uv(uv_value),
-    #          weight = 1,
-    #          color = "blue",
-    #          fillOpacity = 0.3,
-    #          group = "uv",
-    #          label = ~paste0(NAME, ": UV ", round(uv_value, 1))
-    #        )
-    #    }
-    #  }
   })
   
   output$data_table <- renderReactable({
