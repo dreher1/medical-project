@@ -42,4 +42,4 @@ View(uv_table)
 #Code to load population dataset 
 county_population <- read_excel("co-est2024-pop (1).xlsx")
 colnames(county_population)[1] <- "county_state_pop"
-county_population$county_state_pop <- str_remove(county_population$county_state_pop, "^\\.+\\s*")
+#county_population$county_state_pop <- str_remove(county_population$county_state_pop, "^\\.+\\s*")
