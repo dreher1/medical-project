@@ -62,6 +62,45 @@ shinyServer(function(input, output, session) {
   })
   
   
+  # Function to create bivariate colors for Leaflet
+  create_bivariate_colors <- function(uv_values, melanoma_values) {
+    
+    # Remove NAs for quantile calculation
+    uv_clean <- uv_values[!is.na(uv_values) & !is.na(melanoma_values)]
+    mel_clean <- melanoma_values[!is.na(uv_values) & !is.na(melanoma_values)]
+    
+    if(length(uv_clean) < 3 || length(mel_clean) < 3) {
+      return(rep("#F0F0F0", length(uv_values)))
+    }
+    
+    # Calculate quantile breaks
+    uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+    mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+    
+    # Classify values
+    uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
+    mel_class <- cut(melanoma_values, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
+    
+    # DkBlue bivariate palette (3x3 matrix)
+    # Rows = melanoma (low to high), Cols = UV (low to high)
+    color_matrix <- matrix(c(
+      "#E8E8E8", "#ACE4E4", "#5AC8C8",  # Low melanoma
+      "#DFBFD8", "#A28DA8", "#637994",  # Med melanoma  
+      "#BE64AC", "#8C62AA", "#3B4994"   # High melanoma
+    ), nrow = 3, byrow = TRUE)
+    
+    # Map to colors
+    colors <- rep("#F0F0F0", length(uv_values))
+    for (i in seq_along(colors)) {
+      if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
+        row_idx <- as.numeric(mel_class[i])
+        col_idx <- as.numeric(uv_class[i])
+        colors[i] <- color_matrix[row_idx, col_idx]
+      }
+    }
+    
+    return(colors)
+  }
   
   
   #main code block 
@@ -257,7 +296,79 @@ shinyServer(function(input, output, session) {
             layerId = "melanoma_legend"
           )
       }
-      
+      # BIVARIATE VIEW (UV × Melanoma Rate)
+      if (input$melanoma_view == "bivariate") {
+        
+        counties_with_data <- state_counties %>%
+          left_join(
+            melanoma_table %>% select(fips_melanoma, age_adj_inc_rate),
+            by = c("GEOID" = "fips_melanoma")
+          ) %>%
+          left_join(
+            uv_table %>% 
+              mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>%
+              select(fips_uv, uv_value),
+            by = c("GEOID" = "fips_uv")
+          )
+        
+        # Create bivariate colors
+        biv_colors <- create_bivariate_colors(
+          counties_with_data$uv_value,
+          counties_with_data$age_adj_inc_rate
+        )
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = biv_colors,
+            weight = 1,
+            opacity = 1,
+            color = "white",
+            layerId = ~GEOID,
+            fillOpacity = 0.7,
+            group = "melanoma",
+            label = ~paste0(
+              NAME, " County",
+              "<br>UV: ", ifelse(is.na(uv_value), "No data", paste0(round(uv_value, 1), " W/m²")),
+              "<br>Melanoma: ", ifelse(is.na(age_adj_inc_rate), "Suppressed", 
+                                       paste0(round(age_adj_inc_rate, 1), " per 100k"))
+            ) %>% lapply(htmltools::HTML),
+            highlightOptions = highlightOptions(
+              weight = 2,
+              color = "#665",
+              fillOpacity = 0.9,
+              bringToFront = TRUE
+            )
+          ) %>%
+          addControl(
+            html = '<div style="background: white; padding: 12px; border: 2px solid #4169E1; border-radius: 5px;">
+              <strong style="font-size: 13px;">UV × Melanoma Rate</strong><br>
+              <table style="border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width:28px;height:28px;background:#BE64AC;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#8C62AA;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#3B4994;border:1px solid white"></td>
+                  <td rowspan="3" style="writing-mode: vertical-lr; transform: rotate(180deg); padding-left:8px; font-size:11px;">Higher Melanoma →</td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#DFBFD8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#A28DA8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#637994;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#E8E8E8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#ACE4E4;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#5AC8C8;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td colspan="3" style="text-align:center; padding-top:5px; font-size:11px;">Higher UV →</td>
+                </tr>
+              </table>
+            </div>',
+            position = "bottomright",
+            layerId = "melanoma_legend"
+          )
+      } 
     }
     
   })

@@ -2,6 +2,9 @@ library(shiny)
 library(markdown)
 library(leaflet)
 library(reactable)
+library(biscale)
+library(ggplot2)
+library(cowplot)
 
 # Define custom colors taken from an online template
 royal_blue <- "#4169E1" 
@@ -85,7 +88,7 @@ shinyUI(
             "Melanoma by County" = "count",  # Keep your title, add value
             "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
             "UV Measurement (wmh2)" = "uv",
-            "UV vs Melanoma Rate correlation" = "correlation"
+            "Bivariate: UV × Melanoma Rate" = "bivariate"  
           ),
           selected = "none"   
         ),
@@ -105,5 +108,7 @@ shinyUI(
         textOutput("data_summary") 
       )
     )
+    
+    
   )
 )
