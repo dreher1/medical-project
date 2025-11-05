@@ -103,8 +103,45 @@ shinyServer(function(input, output, session) {
   }
   
   
+  #this is a block that shows the descriptions of each option (when each respective option is selected)
+  output$viz_explanation <- renderUI({
+    
+    choice <- input$melanoma_view
+    
+    if (is.null(choice) || choice == "none") {
+      return(NULL)
+    }
+    
+    if (choice == "count") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+           <strong>About Melanoma Cases by County:</strong><br>
+           This map displays the average annual count of invasive melanoma cases for each county from 2017-2021. 
+           Values of 0 indicate suppressed data (≤3 cases). Data source: National Cancer Institute.
+         </div>")
+    } else if (choice == "rate") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+           <strong>About Age-Adjusted Incidence Rate:</strong><br>
+           This map shows the age-adjusted incidence rate per 100,000 population. Age adjustment accounts for differences 
+           in population age distributions. Gray counties indicate suppressed data (<16 cases). Data source: National Cancer Institute.
+         </div>")
+    } else if (choice == "uv") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+           <strong>About UV Measurement:</strong><br>
+           This map displays average UV intensity measured in Watts per square meter (W/m²) for each county from 2020-2024. 
+           Higher values indicate greater UV radiation exposure. Data source: National Institute for Cancer GIS Portal.
+         </div>")
+    } else if (choice == "correlation") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+           <strong>About UV vs Melanoma Rate Correlation:</strong><br>
+           [Placeholder: Add explanation for correlation visualization when implemented]
+         </div>")
+    } else {
+      return(NULL)
+    }
+  })
+
   #main code block 
-  # SINGLE OBSERVER - monitors both state_select and viz_options
+  # SINGLE OBSERVER - this monitors both state_select and viz_options
   observe({
     
     proxy <- leafletProxy("map")
