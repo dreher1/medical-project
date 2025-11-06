@@ -426,3 +426,5 @@ shinyServer(function(input, output, session) {
     paste0("Rows: ", nrow(melanoma_table), " | Columns: ", ncol(melanoma_table))
   })
 })
+
+

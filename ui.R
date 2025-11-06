@@ -109,7 +109,5 @@ shinyUI(
         textOutput("data_summary") 
       )
     )
-    
-    
   )
 )
