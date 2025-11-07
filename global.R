@@ -43,3 +43,31 @@ View(uv_table)
 county_population <- read_excel("co-est2024-pop (1).xlsx")
 colnames(county_population)[1] <- "county_state_pop"
 #county_population$county_state_pop <- str_remove(county_population$county_state_pop, "^\\.+\\s*")
+
+# Load cleaned demographics data
+county_demographics <- read.csv("county_demographics_cleaned.csv", stringsAsFactors = FALSE)
+
+# Remove " County", " Parish", " Borough", etc. from county_demo to match counties_sf format
+library(stringr)
+county_demographics <- county_demographics %>%
+  mutate(
+    county_clean = toupper(str_remove(county_demo, "\\s+(County|Parish|Borough|Census Area|Municipality|City and Borough|City)$")),
+    state_clean = toupper(trimws(state_abr_demo))
+  )
+
+# Create lookup from counties_sf
+county_lookup <- counties_sf %>%
+  st_drop_geometry() %>%
+  mutate(
+    county_clean = toupper(trimws(NAME)),
+    state_clean = STUSPS
+  ) %>%
+  select(GEOID, county_clean, state_clean)
+
+# Join to get FIPS
+county_demographics <- county_demographics %>%
+  left_join(county_lookup, by = c("county_clean", "state_clean")) %>%
+  rename(fips_demo = GEOID)
+
+# Check results
+cat("Matched:", sum(!is.na(county_demographics$fips_demo)), "out of", nrow(county_demographics), "counties\n")

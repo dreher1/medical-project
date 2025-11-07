@@ -8,6 +8,101 @@ library(dplyr)
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
 shinyServer(function(input, output, session) {
+  #_____
+    create_weighted_bivariate_colors <- function(uv_values, melanoma_values, white_pct) {
+      
+      # Calculate melanoma rate PER WHITE POPULATION
+      # This shows: among the vulnerable (white) population, how high is the rate?
+      # Lower white % with same melanoma = HIGHER rate per white person = MORE SEVERE
+      melanoma_per_white <- melanoma_values / (white_pct / 100)
+      
+      # Suppress if white population too small (less than 10% = unreliable)
+      melanoma_per_white[white_pct < 10] <- NA
+      
+      # Remove NAs
+      valid_idx <- !is.na(uv_values) & !is.na(melanoma_per_white)
+      
+      if(sum(valid_idx) < 3) {
+        return(rep("#F0F0F0", length(uv_values)))
+      }
+      
+      uv_clean <- uv_values[valid_idx]
+      mel_clean <- melanoma_per_white[valid_idx]
+      
+      # Calculate quantile breaks
+      uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+      mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+      
+      # Classify values
+      uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
+      mel_class <- cut(melanoma_per_white, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
+      
+      # Color matrix
+      color_matrix <- matrix(c(
+        "#E8E8E8", "#ACE4E4", "#5AC8C8",
+        "#DFBFD8", "#A28DA8", "#637994",
+        "#BE64AC", "#8C62AA", "#3B4994"
+      ), nrow = 3, byrow = TRUE)
+      
+      # Map to colors
+      colors <- rep("#F0F0F0", length(uv_values))
+      for (i in seq_along(colors)) {
+        if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
+          row_idx <- as.numeric(mel_class[i])
+          col_idx <- as.numeric(uv_class[i])
+          colors[i] <- color_matrix[row_idx, col_idx]
+        }
+      }
+      
+      return(colors)
+    }
+  
+  
+  # Alternative: Melanoma rate per white population
+  create_white_only_bivariate <- function(uv_values, melanoma_values, white_pct) {
+    
+    # Calculate melanoma rate per white population
+    # This adjusts for the fact that melanoma primarily affects white populations
+    melanoma_per_white <- melanoma_values / (white_pct / 100)
+    melanoma_per_white[white_pct < 5] <- NA  # Suppress if very low white pop
+    
+    # Remove NAs
+    valid_idx <- !is.na(uv_values) & !is.na(melanoma_per_white)
+    
+    if(sum(valid_idx) < 3) {
+      return(rep("#F0F0F0", length(uv_values)))
+    }
+    
+    uv_clean <- uv_values[valid_idx]
+    mel_clean <- melanoma_per_white[valid_idx]
+    
+    # Calculate quantile breaks
+    uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+    mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+    
+    # Classify values
+    uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
+    mel_class <- cut(melanoma_per_white, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
+    
+    # Same color matrix
+    color_matrix <- matrix(c(
+      "#E8E8E8", "#ACE4E4", "#5AC8C8",
+      "#DFBFD8", "#A28DA8", "#637994",
+      "#BE64AC", "#8C62AA", "#3B4994"
+    ), nrow = 3, byrow = TRUE)
+    
+    colors <- rep("#F0F0F0", length(uv_values))
+    for (i in seq_along(colors)) {
+      if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
+        row_idx <- as.numeric(mel_class[i])
+        col_idx <- as.numeric(uv_class[i])
+        colors[i] <- color_matrix[row_idx, col_idx]
+      }
+    }
+    
+    return(colors)
+  }
+  #__
   
   output$home_text <- renderUI({
     HTML("Welcome to our BIO-185 project on data visualization for Melanoma cases in the United States.
@@ -104,6 +199,8 @@ shinyServer(function(input, output, session) {
   
   
   #this is a block that shows the descriptions of each option (when each respective option is selected)
+  # Replace your viz_explanation output with this corrected version:
+  
   output$viz_explanation <- renderUI({
     
     choice <- input$melanoma_view
@@ -114,27 +211,50 @@ shinyServer(function(input, output, session) {
     
     if (choice == "count") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
-           <strong>About Melanoma Cases by County:</strong><br>
-           This map displays the average annual count of invasive melanoma cases for each county from 2017-2021. 
-           Values of 0 indicate suppressed data (≤3 cases). Data source: National Cancer Institute.
-         </div>")
+         <strong>About Melanoma Cases by County:</strong><br>
+         This map displays the average annual count of invasive melanoma cases for each county from 2017-2021. 
+         Values of 0 indicate suppressed data (≤3 cases). Data source: National Cancer Institute.
+       </div>")
     } else if (choice == "rate") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
-           <strong>About Age-Adjusted Incidence Rate:</strong><br>
-           This map shows the age-adjusted incidence rate per 100,000 population. Age adjustment accounts for differences 
-           in population age distributions. Gray counties indicate suppressed data (<16 cases). Data source: National Cancer Institute.
-         </div>")
+         <strong>About Age-Adjusted Incidence Rate:</strong><br>
+         This map shows the age-adjusted incidence rate per 100,000 population. Age adjustment accounts for differences 
+         in population age distributions. Gray counties indicate suppressed data (<16 cases). Data source: National Cancer Institute.
+       </div>")
     } else if (choice == "uv") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
-           <strong>About UV Measurement:</strong><br>
-           This map displays average UV intensity measured in Watts per square meter (W/m²) for each county from 2020-2024. 
-           Higher values indicate greater UV radiation exposure. Data source: National Institute for Cancer GIS Portal.
-         </div>")
-    } else if (choice == "correlation") {
+         <strong>About UV Measurement:</strong><br>
+         This map displays average UV intensity measured in Watts per square meter (W/m²) for each county from 2020-2024. 
+         Higher values indicate greater UV radiation exposure. Data source: National Institute for Cancer GIS Portal.
+       </div>")
+    } else if (choice == "bivariate") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
-           <strong>About UV vs Melanoma Rate Correlation:</strong><br>
-           [Placeholder: Add explanation for correlation visualization when implemented]
-         </div>")
+         <strong>About Bivariate Mapping:</strong><br>
+         This map shows the relationship between UV exposure and melanoma rates simultaneously using a 3×3 color scheme.
+         Counties in the top-right corner (dark blue/purple) have both high UV and high melanoma rates.
+         <em>Note: This map does not account for population demographics.</em>
+       </div>")
+    }  else if (choice == "bivariate_weighted") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+       <strong>About Risk-Adjusted Bivariate Mapping:</strong><br>
+       This advanced map calculates melanoma rates <strong>per white (non-Hispanic) population</strong>, since melanoma 
+       affects white populations 20-30× more than other racial groups. 
+       <br><br>
+       <strong>Why this matters:</strong> The displayed <strong>Rate per 100k White</strong> shows the melanoma burden 
+       specifically within the at-risk population. A county with 30 cases per 100k total population and only 30% white 
+       population actually has <strong>100 cases per 100k white residents</strong> - indicating a severe problem within 
+       that vulnerable group.
+       <br><br>
+       <strong>Interpretation:</strong> 
+       <ul style='margin: 10px 0;'>
+         <li><strong>Low white % + High melanoma rate</strong> = Very high rate per white person (dark colors) = Severe localized problem</li>
+         <li><strong>High white % + High melanoma rate</strong> = Moderate rate per white person (medium colors) = Expected endemic level</li>
+         <li><strong>Darkest areas</strong> = Highest UV exposure combined with highest melanoma rates within white populations</li>
+       </ul>
+       This helps identify counties where melanoma disproportionately affects the white population, which may indicate 
+       environmental, behavioral, or screening disparities that warrant targeted public health interventions.
+     </div>")
+    
     } else {
       return(NULL)
     }
@@ -298,7 +418,7 @@ shinyServer(function(input, output, session) {
           palette = c("#FFFFCC", "#FFEDA0", "#FED976", "#FEB24C", "#FD8D3C", 
                       "#FC4E2A", "#E31A1C", "#BD0026", "#800026", "#67001F", "#4D0015", "#33000D"),
           domain = counties_with_data$uv_value,
-          bins = c(0, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000, 5200, 5400, 5700, Inf),
+          bins = c(3000, 3400, 3800, 4200, 4600, 5000, 5400, 5800),
           na.color = "#F0F0F0"
         )
         
@@ -406,6 +526,100 @@ shinyServer(function(input, output, session) {
             layerId = "melanoma_legend"
           )
       } 
+      if (input$melanoma_view == "bivariate_weighted") {
+        
+        counties_with_data <- state_counties %>%
+          left_join(
+            melanoma_table %>% select(fips_melanoma, age_adj_inc_rate),
+            by = c("GEOID" = "fips_melanoma")
+          ) %>%
+          left_join(
+            uv_table %>% 
+              mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>%
+              select(fips_uv, uv_value),
+            by = c("GEOID" = "fips_uv")
+          ) %>%
+          left_join(
+            county_demographics %>%
+              select(fips_demo, white_not_h_or_l_pct),
+            by = c("GEOID" = "fips_demo")
+          )
+        
+        # Create risk-weighted bivariate colors
+        biv_colors <- create_weighted_bivariate_colors(
+          counties_with_data$uv_value,
+          counties_with_data$age_adj_inc_rate,
+          counties_with_data$white_not_h_or_l_pct
+        )
+        
+        # Override with pure white for suppressed melanoma data
+        biv_colors[is.na(counties_with_data$age_adj_inc_rate)] <- "#FFFFFF"
+        
+        # Calculate risk score for display
+        counties_with_data$risk_score <- counties_with_data$age_adj_inc_rate / 
+          (counties_with_data$white_not_h_or_l_pct / 100)
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = biv_colors,
+            weight = 1,
+            opacity = 1,
+            color = "white",
+            layerId = ~GEOID,
+            fillOpacity = 0.7,
+            group = "melanoma",
+            label = ~paste0(
+              NAME, " County",
+              "<br>UV: ", ifelse(is.na(uv_value), "No data", paste0(round(uv_value, 1), " W/m²")),
+              "<br>Melanoma Rate: ", ifelse(is.na(age_adj_inc_rate), "Suppressed", 
+                                            paste0(round(age_adj_inc_rate, 1), " per 100k total")),
+              "<br>White Pop: ", ifelse(is.na(white_not_h_or_l_pct), "No data",
+                                        paste0(round(white_not_h_or_l_pct, 1), "%")),
+              "<br><strong>Rate per 100k White: ", ifelse(is.na(risk_score), "N/A",
+                                                          paste0(round(risk_score, 1), "</strong>"))
+            
+            ) %>% lapply(htmltools::HTML),
+            highlightOptions = highlightOptions(
+              weight = 2,
+              color = "#665",
+              fillOpacity = 0.9,
+              bringToFront = TRUE
+            )
+          ) %>%
+          addControl(
+            html = '<div style="background: white; padding: 12px; border: 2px solid #4169E1; border-radius: 5px;">
+              <strong style="font-size: 13px;">Risk-Adjusted Map</strong><br>
+              <p style="font-size: 11px; margin: 5px 0;">UV × Melanoma (weighted by white population %)</p>
+              <table style="border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width:28px;height:28px;background:#BE64AC;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#8C62AA;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#3B4994;border:1px solid white"></td>
+                  <td rowspan="3" style="writing-mode: vertical-lr; transform: rotate(180deg); padding-left:8px; font-size:11px;">Higher Risk →</td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#DFBFD8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#A28DA8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#637994;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#E8E8E8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#ACE4E4;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#5AC8C8;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td colspan="3" style="text-align:center; padding-top:5px; font-size:11px;">Higher UV →</td>
+                </tr>
+              </table>
+              <p style="font-size: 10px; color: #666; margin-top: 8px;">
+              Darkest areas = Highest combined risk from UV exposure in vulnerable populations</p>
+            </div>',
+            position = "bottomright",
+            layerId = "melanoma_legend"
+          )
+      }
+      
     }
     
   })

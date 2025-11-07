@@ -125,6 +125,9 @@ county_demographics <- county_demographics[!rm_idx, , drop = FALSE]
 drop_idx <- grepl("^\\s*(alaska|ak)\\s*$", county_demographics$state_abr_demo, ignore.case = TRUE)
 county_demographics <- county_demographics[!drop_idx, , drop = FALSE]
 
+write.csv(county_demographics, "county_demographics_cleaned.csv", row.names = FALSE)
+
+
 
 ```
 
