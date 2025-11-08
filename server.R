@@ -8,89 +8,26 @@ library(dplyr)
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
 shinyServer(function(input, output, session) {
-  #_____
-    create_weighted_bivariate_colors <- function(uv_values, melanoma_values, white_pct) {
-      
-      # Calculate melanoma rate PER WHITE POPULATION
-      # This shows: among the vulnerable (white) population, how high is the rate?
-      # Lower white % with same melanoma = HIGHER rate per white person = MORE SEVERE
-      melanoma_per_white <- melanoma_values / (white_pct / 100)
-      
-      # Suppress if white population too small (less than 10% = unreliable)
-      melanoma_per_white[white_pct < 10] <- NA
-      
-      # Remove NAs
-      valid_idx <- !is.na(uv_values) & !is.na(melanoma_per_white)
-      
-      if(sum(valid_idx) < 3) {
-        return(rep("#F0F0F0", length(uv_values)))
-      }
-      
-      uv_clean <- uv_values[valid_idx]
-      mel_clean <- melanoma_per_white[valid_idx]
-      
-      # Calculate quantile breaks
-      uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-      mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-      
-      # Classify values
-      uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
-      mel_class <- cut(melanoma_per_white, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
-      
-      # Color matrix
-      color_matrix <- matrix(c(
-        "#E8E8E8", "#ACE4E4", "#5AC8C8",
-        "#DFBFD8", "#A28DA8", "#637994",
-        "#BE64AC", "#8C62AA", "#3B4994"
-      ), nrow = 3, byrow = TRUE)
-      
-      # Map to colors
-      colors <- rep("#F0F0F0", length(uv_values))
-      for (i in seq_along(colors)) {
-        if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
-          row_idx <- as.numeric(mel_class[i])
-          col_idx <- as.numeric(uv_class[i])
-          colors[i] <- color_matrix[row_idx, col_idx]
-        }
-      }
-      
-      return(colors)
-    }
   
+  # ============================================================================
+  # BIVARIATE COLOR FUNCTIONS (using US-wide breaks from global.R)
+  # ============================================================================
   
-  # Alternative: Melanoma rate per white population
-  create_white_only_bivariate <- function(uv_values, melanoma_values, white_pct) {
+  # Standard Bivariate: UV × Melanoma Rate (no demographic adjustment)
+  create_bivariate_colors <- function(uv_values, melanoma_values) {
     
-    # Calculate melanoma rate per white population
-    # This adjusts for the fact that melanoma primarily affects white populations
-    melanoma_per_white <- melanoma_values / (white_pct / 100)
-    melanoma_per_white[white_pct < 5] <- NA  # Suppress if very low white pop
+    # Use US-wide breaks (calculated in global.R)
+    uv_class <- cut(uv_values, breaks = us_uv_breaks, labels = 1:3, include.lowest = TRUE)
+    mel_class <- cut(melanoma_values, breaks = us_melanoma_breaks, labels = 1:3, include.lowest = TRUE)
     
-    # Remove NAs
-    valid_idx <- !is.na(uv_values) & !is.na(melanoma_per_white)
-    
-    if(sum(valid_idx) < 3) {
-      return(rep("#F0F0F0", length(uv_values)))
-    }
-    
-    uv_clean <- uv_values[valid_idx]
-    mel_clean <- melanoma_per_white[valid_idx]
-    
-    # Calculate quantile breaks
-    uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-    mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-    
-    # Classify values
-    uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
-    mel_class <- cut(melanoma_per_white, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
-    
-    # Same color matrix
+    # Color matrix
     color_matrix <- matrix(c(
-      "#E8E8E8", "#ACE4E4", "#5AC8C8",
-      "#DFBFD8", "#A28DA8", "#637994",
-      "#BE64AC", "#8C62AA", "#3B4994"
+      "#E8E8E8", "#ACE4E4", "#5AC8C8",  # Low melanoma
+      "#DFBFD8", "#A28DA8", "#637994",  # Med melanoma  
+      "#BE64AC", "#8C62AA", "#3B4994"   # High melanoma
     ), nrow = 3, byrow = TRUE)
     
+    # Map to colors
     colors <- rep("#F0F0F0", length(uv_values))
     for (i in seq_along(colors)) {
       if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
@@ -102,7 +39,41 @@ shinyServer(function(input, output, session) {
     
     return(colors)
   }
-  #__
+  
+  # Risk-Adjusted Bivariate: UV × Melanoma per White Population
+  create_weighted_bivariate_colors <- function(uv_values, melanoma_values, white_pct) {
+    
+    # Calculate melanoma rate PER WHITE POPULATION
+    melanoma_per_white <- melanoma_values / (white_pct / 100)
+    melanoma_per_white[white_pct < 10] <- NA  # Suppress if white pop < 10%
+    
+    # Use US-wide breaks (calculated in global.R)
+    uv_class <- cut(uv_values, breaks = us_uv_breaks, labels = 1:3, include.lowest = TRUE)
+    mel_class <- cut(melanoma_per_white, breaks = us_melanoma_per_white_breaks, labels = 1:3, include.lowest = TRUE)
+    
+    # Color matrix
+    color_matrix <- matrix(c(
+      "#E8E8E8", "#ACE4E4", "#5AC8C8",
+      "#DFBFD8", "#A28DA8", "#637994",
+      "#BE64AC", "#8C62AA", "#3B4994"
+    ), nrow = 3, byrow = TRUE)
+    
+    # Map to colors
+    colors <- rep("#F0F0F0", length(uv_values))
+    for (i in seq_along(colors)) {
+      if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
+        row_idx <- as.numeric(mel_class[i])
+        col_idx <- as.numeric(uv_class[i])
+        colors[i] <- color_matrix[row_idx, col_idx]
+      }
+    }
+    
+    return(colors)
+  }
+  
+  # ============================================================================
+  # HOME TAB OUTPUTS
+  # ============================================================================
   
   output$home_text <- renderUI({
     HTML("Welcome to our BIO-185 project on data visualization for Melanoma cases in the United States.
@@ -142,6 +113,10 @@ shinyServer(function(input, output, session) {
   <br><br>To view the data, visit the Visualizations tab in the menu bar.")
   })
   
+  # ============================================================================
+  # VISUALIZATION TAB - MAP AND EXPLANATIONS
+  # ============================================================================
+  
   output$viz_plot <- renderPlot({
     plot(cars, main = "Placeholder Plot")
   })
@@ -156,51 +131,7 @@ shinyServer(function(input, output, session) {
       setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
   
-  
-  # Function to create bivariate colors for Leaflet
-  create_bivariate_colors <- function(uv_values, melanoma_values) {
-    
-    # Remove NAs for quantile calculation
-    uv_clean <- uv_values[!is.na(uv_values) & !is.na(melanoma_values)]
-    mel_clean <- melanoma_values[!is.na(uv_values) & !is.na(melanoma_values)]
-    
-    if(length(uv_clean) < 3 || length(mel_clean) < 3) {
-      return(rep("#F0F0F0", length(uv_values)))
-    }
-    
-    # Calculate quantile breaks
-    uv_breaks <- quantile(uv_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-    mel_breaks <- quantile(mel_clean, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
-    
-    # Classify values
-    uv_class <- cut(uv_values, breaks = uv_breaks, labels = 1:3, include.lowest = TRUE)
-    mel_class <- cut(melanoma_values, breaks = mel_breaks, labels = 1:3, include.lowest = TRUE)
-    
-    # DkBlue bivariate palette (3x3 matrix)
-    # Rows = melanoma (low to high), Cols = UV (low to high)
-    color_matrix <- matrix(c(
-      "#E8E8E8", "#ACE4E4", "#5AC8C8",  # Low melanoma
-      "#DFBFD8", "#A28DA8", "#637994",  # Med melanoma  
-      "#BE64AC", "#8C62AA", "#3B4994"   # High melanoma
-    ), nrow = 3, byrow = TRUE)
-    
-    # Map to colors
-    colors <- rep("#F0F0F0", length(uv_values))
-    for (i in seq_along(colors)) {
-      if (!is.na(uv_class[i]) && !is.na(mel_class[i])) {
-        row_idx <- as.numeric(mel_class[i])
-        col_idx <- as.numeric(uv_class[i])
-        colors[i] <- color_matrix[row_idx, col_idx]
-      }
-    }
-    
-    return(colors)
-  }
-  
-  
-  #this is a block that shows the descriptions of each option (when each respective option is selected)
-  # Replace your viz_explanation output with this corrected version:
-  
+  # Dynamic explanation text based on selected visualization
   output$viz_explanation <- renderUI({
     
     choice <- input$melanoma_view
@@ -231,14 +162,15 @@ shinyServer(function(input, output, session) {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
          <strong>About Bivariate Mapping:</strong><br>
          This map shows the relationship between UV exposure and melanoma rates simultaneously using a 3×3 color scheme.
-         Counties in the top-right corner (dark blue/purple) have both high UV and high melanoma rates.
+         Counties are classified relative to <strong>national averages</strong>, not just within the selected state.
+         Counties in the top-right corner (dark blue/purple) have both high UV and high melanoma rates compared to the entire US.
          <em>Note: This map does not account for population demographics.</em>
        </div>")
-    }  else if (choice == "bivariate_weighted") {
+    } else if (choice == "bivariate_weighted") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
        <strong>About Risk-Adjusted Bivariate Mapping:</strong><br>
        This advanced map calculates melanoma rates <strong>per white (non-Hispanic) population</strong>, since melanoma 
-       affects white populations 20-30× more than other racial groups. 
+       affects white populations 20-30× more than other racial groups. Counties are classified relative to <strong>national rates</strong>.
        <br><br>
        <strong>Why this matters:</strong> The displayed <strong>Rate per 100k White</strong> shows the melanoma burden 
        specifically within the at-risk population. A county with 30 cases per 100k total population and only 30% white 
@@ -249,32 +181,34 @@ shinyServer(function(input, output, session) {
        <ul style='margin: 10px 0;'>
          <li><strong>Low white % + High melanoma rate</strong> = Very high rate per white person (dark colors) = Severe localized problem</li>
          <li><strong>High white % + High melanoma rate</strong> = Moderate rate per white person (medium colors) = Expected endemic level</li>
-         <li><strong>Darkest areas</strong> = Highest UV exposure combined with highest melanoma rates within white populations</li>
+         <li><strong>Darkest areas</strong> = Highest UV exposure combined with highest melanoma rates within white populations, relative to the entire US</li>
        </ul>
        This helps identify counties where melanoma disproportionately affects the white population, which may indicate 
        environmental, behavioral, or screening disparities that warrant targeted public health interventions.
      </div>")
-    
     } else {
       return(NULL)
     }
   })
-
-  #main code block 
-  # SINGLE OBSERVER - this monitors both state_select and viz_options
+  
+  # ============================================================================
+  # MAIN MAP OBSERVER - Updates map based on user selections
+  # ============================================================================
+  
   observe({
     
     proxy <- leafletProxy("map")
     
-    # Clear all layers
+    # Clear all existing layers
     proxy %>% 
       clearGroup("state_focus") %>%
       clearGroup("melanoma") %>%
       removeControl("melanoma_legend")
+    
+    # ========== ALL STATES VIEW ==========
     if (input$state_select == "All states (USA)") {
       proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
       
-      # Show notification if user tries to check melanoma without selecting a state
       if (input$melanoma_view != "none") {
         showNotification(
           "Please select a specific state to view melanoma data",
@@ -283,15 +217,19 @@ shinyServer(function(input, output, session) {
         )
       }
       
+      # ========== SPECIFIC STATE VIEW ==========
     } else {
+      
+      # Zoom to selected state
       sel <- states_sf[states_sf$NAME == input$state_select, ]
       if (nrow(sel) > 0) {
         bb <- sf::st_bbox(sel)
         proxy %>%
-          addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, opacity = 1, group = "state_focus") %>%
-          fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
+          addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                      opacity = 1, group = "state_focus") %>%
+          fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], 
+                    lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
       }
-      
       
       # Get state abbreviation
       state_abbr <- state.abb[match(input$state_select, state.name)]
@@ -302,17 +240,15 @@ shinyServer(function(input, output, session) {
       # Filter counties for selected state
       state_counties <- counties_sf[counties_sf$STUSPS == state_abbr, ]
       
-      # Check if melanoma checkbox is checked
+      # ========== MELANOMA CASE COUNT ==========
       if (input$melanoma_view == "count") {
         
-        # Join with melanoma data
         counties_with_data <- state_counties %>%
           left_join(
             melanoma_table[, c("fips_melanoma", "county", "state", "avg_annual_ct")],
             by = c("GEOID" = "fips_melanoma")
           )
         
-        # Create color palette
         pal <- colorBin(
           palette = "YlOrRd",
           domain = counties_with_data$avg_annual_ct,
@@ -320,17 +256,12 @@ shinyServer(function(input, output, session) {
           na.color = "#F0F0F0"
         )
         
-        # Add county polygons
         proxy %>%
           addPolygons(
             data = counties_with_data,
             fillColor = ~pal(avg_annual_ct),
-            weight = 1,
-            opacity = 1,
-            color = "white",
-            layerId = ~GEOID,
-            fillOpacity = 0.7,
-            group = "melanoma",
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
             label = ~ifelse(
               is.na(avg_annual_ct),
               paste0(NAME, " County: No data available"),
@@ -339,23 +270,18 @@ shinyServer(function(input, output, session) {
                      " cases/year")
             ),
             highlightOptions = highlightOptions(
-              weight = 2,
-              color = "#665",
-              fillOpacity = 0.9,
-              bringToFront = TRUE
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
             )
           ) %>%
           addLegend(
-            position = "bottomright",
-            pal = pal,
+            position = "bottomright", pal = pal, 
             values = counties_with_data$avg_annual_ct,
             title = "Annual<br>Melanoma Cases<br>(County Level)",
-            opacity = 0.7,
-            layerId = "melanoma_legend"
+            opacity = 0.7, layerId = "melanoma_legend"
           )
       }
       
-      # INCIDENCE RATE VIEW
+      # ========== MELANOMA INCIDENCE RATE ==========
       if (input$melanoma_view == "rate") {
         
         counties_with_data <- state_counties %>%
@@ -375,35 +301,26 @@ shinyServer(function(input, output, session) {
           addPolygons(
             data = counties_with_data,
             fillColor = ~pal(age_adj_inc_rate),
-            weight = 1,
-            opacity = 1,
-            color = "white",
-            layerId = ~GEOID,
-            fillOpacity = 0.7,
-            group = "melanoma",
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
             label = ~ifelse(
               is.na(age_adj_inc_rate),
               paste0(NAME, " County: Data suppressed (<16 cases)"),
               paste0(NAME, " County: ", round(age_adj_inc_rate, 1), " per 100k (age-adj)")
             ),
             highlightOptions = highlightOptions(
-              weight = 2,
-              color = "#665",
-              fillOpacity = 0.9,
-              bringToFront = TRUE
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
             )
           ) %>%
           addLegend(
-            position = "bottomright",
-            pal = pal,
+            position = "bottomright", pal = pal,
             values = counties_with_data$age_adj_inc_rate,
             title = "Age-Adjusted<br>Incidence Rate<br>(per 100,000)<br><span style='font-size:9px;'>(Gray = Suppressed)</span>",
-            opacity = 0.7,
-            layerId = "melanoma_legend"
+            opacity = 0.7, layerId = "melanoma_legend"
           )
       }
       
-      
+      # ========== UV INTENSITY ==========
       if (input$melanoma_view == "uv") {
         
         counties_with_data <- state_counties %>%
@@ -415,8 +332,8 @@ shinyServer(function(input, output, session) {
           )
         
         pal <- colorBin(
-          palette = c("#FFFFCC", "#FFEDA0", "#FED976", "#FEB24C", "#FD8D3C", 
-                      "#FC4E2A", "#E31A1C", "#BD0026", "#800026", "#67001F", "#4D0015", "#33000D"),
+          palette = c("#FFFFCC", "#FED976", "#FEB24C", "#FD8D3C", 
+                      "#E31A1C", "#BD0026", "#800026"),
           domain = counties_with_data$uv_value,
           bins = c(3000, 3400, 3800, 4200, 4600, 5000, 5400, 5800),
           na.color = "#F0F0F0"
@@ -426,34 +343,26 @@ shinyServer(function(input, output, session) {
           addPolygons(
             data = counties_with_data,
             fillColor = ~pal(uv_value),
-            weight = 1,
-            opacity = 1,
-            color = "white",
-            layerId = ~GEOID,
-            fillOpacity = 0.7,
-            group = "melanoma",
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
             label = ~ifelse(
               is.na(uv_value),
               paste0(NAME, " County: No UV data available"),
               paste0(NAME, " County: ", round(uv_value, 1), " W/m²")
             ),
             highlightOptions = highlightOptions(
-              weight = 2,
-              color = "#665",
-              fillOpacity = 0.9,
-              bringToFront = TRUE
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
             )
           ) %>%
           addLegend(
-            position = "bottomright",
-            pal = pal,
+            position = "bottomright", pal = pal,
             values = counties_with_data$uv_value,
             title = "UV Intensity<br>(W/m²)",
-            opacity = 0.7,
-            layerId = "melanoma_legend"
+            opacity = 0.7, layerId = "melanoma_legend"
           )
       }
-      # BIVARIATE VIEW (UV × Melanoma Rate)
+      
+      # ========== BIVARIATE: UV × MELANOMA RATE ==========
       if (input$melanoma_view == "bivariate") {
         
         counties_with_data <- state_counties %>%
@@ -468,7 +377,7 @@ shinyServer(function(input, output, session) {
             by = c("GEOID" = "fips_uv")
           )
         
-        # Create bivariate colors
+        # Create bivariate colors using US-wide breaks
         biv_colors <- create_bivariate_colors(
           counties_with_data$uv_value,
           counties_with_data$age_adj_inc_rate
@@ -478,12 +387,8 @@ shinyServer(function(input, output, session) {
           addPolygons(
             data = counties_with_data,
             fillColor = biv_colors,
-            weight = 1,
-            opacity = 1,
-            color = "white",
-            layerId = ~GEOID,
-            fillOpacity = 0.7,
-            group = "melanoma",
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
             label = ~paste0(
               NAME, " County",
               "<br>UV: ", ifelse(is.na(uv_value), "No data", paste0(round(uv_value, 1), " W/m²")),
@@ -491,15 +396,13 @@ shinyServer(function(input, output, session) {
                                        paste0(round(age_adj_inc_rate, 1), " per 100k"))
             ) %>% lapply(htmltools::HTML),
             highlightOptions = highlightOptions(
-              weight = 2,
-              color = "#665",
-              fillOpacity = 0.9,
-              bringToFront = TRUE
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
             )
           ) %>%
           addControl(
             html = '<div style="background: white; padding: 12px; border: 2px solid #4169E1; border-radius: 5px;">
               <strong style="font-size: 13px;">UV × Melanoma Rate</strong><br>
+              <p style="font-size: 10px; margin: 5px 0;">(National scale)</p>
               <table style="border-collapse: collapse; margin-top: 8px;">
                 <tr>
                   <td style="width:28px;height:28px;background:#BE64AC;border:1px solid white"></td>
@@ -525,7 +428,9 @@ shinyServer(function(input, output, session) {
             position = "bottomright",
             layerId = "melanoma_legend"
           )
-      } 
+      }
+      
+      # ========== RISK-ADJUSTED BIVARIATE: UV × MELANOMA PER WHITE POP ==========
       if (input$melanoma_view == "bivariate_weighted") {
         
         counties_with_data <- state_counties %>%
@@ -545,7 +450,7 @@ shinyServer(function(input, output, session) {
             by = c("GEOID" = "fips_demo")
           )
         
-        # Create risk-weighted bivariate colors
+        # Create risk-weighted bivariate colors using US-wide breaks
         biv_colors <- create_weighted_bivariate_colors(
           counties_with_data$uv_value,
           counties_with_data$age_adj_inc_rate,
@@ -563,12 +468,8 @@ shinyServer(function(input, output, session) {
           addPolygons(
             data = counties_with_data,
             fillColor = biv_colors,
-            weight = 1,
-            opacity = 1,
-            color = "white",
-            layerId = ~GEOID,
-            fillOpacity = 0.7,
-            group = "melanoma",
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
             label = ~paste0(
               NAME, " County",
               "<br>UV: ", ifelse(is.na(uv_value), "No data", paste0(round(uv_value, 1), " W/m²")),
@@ -578,19 +479,15 @@ shinyServer(function(input, output, session) {
                                         paste0(round(white_not_h_or_l_pct, 1), "%")),
               "<br><strong>Rate per 100k White: ", ifelse(is.na(risk_score), "N/A",
                                                           paste0(round(risk_score, 1), "</strong>"))
-            
             ) %>% lapply(htmltools::HTML),
             highlightOptions = highlightOptions(
-              weight = 2,
-              color = "#665",
-              fillOpacity = 0.9,
-              bringToFront = TRUE
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
             )
           ) %>%
           addControl(
             html = '<div style="background: white; padding: 12px; border: 2px solid #4169E1; border-radius: 5px;">
               <strong style="font-size: 13px;">Risk-Adjusted Map</strong><br>
-              <p style="font-size: 11px; margin: 5px 0;">UV × Melanoma (weighted by white population %)</p>
+              <p style="font-size: 10px; margin: 5px 0;">UV × Melanoma per white pop (National scale)</p>
               <table style="border-collapse: collapse; margin-top: 8px;">
                 <tr>
                   <td style="width:28px;height:28px;background:#BE64AC;border:1px solid white"></td>
@@ -613,16 +510,20 @@ shinyServer(function(input, output, session) {
                 </tr>
               </table>
               <p style="font-size: 10px; color: #666; margin-top: 8px;">
-              Darkest areas = Highest combined risk from UV exposure in vulnerable populations</p>
+              Darkest = Highest UV + melanoma rate within white populations (US-wide)</p>
             </div>',
             position = "bottomright",
             layerId = "melanoma_legend"
           )
       }
       
-    }
+    } # End of specific state view
     
-  })
+  }) # End of observe block
+  
+  # ============================================================================
+  # DATA EXPLORER TAB
+  # ============================================================================
   
   output$data_table <- renderReactable({
     req(melanoma_table)
@@ -639,6 +540,5 @@ shinyServer(function(input, output, session) {
   output$data_summary <- renderText({
     paste0("Rows: ", nrow(melanoma_table), " | Columns: ", ncol(melanoma_table))
   })
-})
-
-
+  
+}) # End of shinyServer
