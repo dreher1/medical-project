@@ -13,7 +13,7 @@ dark_blue  <- "#1E3A8A"
 
 
 #state dropdown choices (includes DC)
-state_choices <- c("All states (USA)", sort(c(state.name, "District of Columbia")))
+state_choices <- c(sort(c(state.name, "District of Columbia")))
 
 #create the user interface establishment
 shinyUI(
@@ -84,14 +84,13 @@ shinyUI(
           inputId = "melanoma_view",  # Changed from "viz_options"
           label   = "Show data layers:",
           choices = c(
-            "None" = "none",
             "Melanoma by County" = "count",  # Keep your title, add value
             "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
             "UV Measurement (wmh2)" = "uv",
             "Bivariate: UV × Melanoma Rate" = "bivariate" ,
             "Risk-Adjusted: UV × Melanoma (White Pop Weighted)" = "bivariate_weighted"  # NEW
           ),
-          selected = "none"   
+          selected = "count"   
         ),
         
         leafletOutput("map", height = "400px"),
@@ -104,10 +103,35 @@ shinyUI(
       "Data Explorer",
       fluidPage(
         h2("Data Explorer"),
+        
+        # Melanoma Table Section
+        h3("Melanoma Data"),
         p("Explore the melanoma_table interactively:"),
         reactableOutput("data_table", height = 500),
         br(),
-        textOutput("data_summary") 
+        textOutput("data_summary"),
+        downloadButton("download_data", "Download Melanoma Data (CSV)"),
+        br(),
+        br(),
+        
+        # UV Table Section
+        h3("UV Data"),
+        p("Explore the UV data interactively:"),
+        reactableOutput("uv_table", height = 500),
+        br(),
+        textOutput("uv_summary"),
+        downloadButton("download_uv", "Download UV Data (CSV)"),
+        br(),
+        br(),
+        
+        # County Demographics Table Section
+        h3("County Demographics Data"),
+        p("Explore the county population data interactively:"),
+        reactableOutput("demographics_table", height = 500),
+        br(),
+        textOutput("demographics_summary"),
+        downloadButton("download_demographics", "Download County Population Data (CSV)"),
+        br()
       )
     )
   )

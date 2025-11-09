@@ -126,19 +126,79 @@ shinyServer(function(input, output, session) {
   })
   
   output$map <- renderLeaflet({
-    leaflet(options = leafletOptions(zoomControl = TRUE)) |>
-      addProviderTiles(providers$CartoDB.Positron) |>
-      setView(lng = -98.5, lat = 39.8, zoom = 4)
+    
+    # Get default state
+    default_state <- input$state_select
+    if (is.null(default_state)) {
+      default_state <- "Alabama"
+    }
+    
+    # Get state boundaries
+    sel <- states_sf[states_sf$NAME == default_state, ]
+    
+    # Get state abbreviation
+    state_abbr <- state.abb[match(default_state, state.name)]
+    if (is.na(state_abbr) && default_state == "District of Columbia") {
+      state_abbr <- "DC"
+    }
+    
+    # Filter counties for default state
+    state_counties <- counties_sf[counties_sf$STUSPS == state_abbr, ]
+    
+    # Join with melanoma data
+    counties_with_data <- state_counties %>%
+      left_join(
+        melanoma_table[, c("fips_melanoma", "county", "state", "avg_annual_ct")],
+        by = c("GEOID" = "fips_melanoma")
+      )
+    
+    # Create color palette
+    pal <- colorBin(
+      palette = "YlOrRd",
+      domain = counties_with_data$avg_annual_ct,
+      bins = c(0, 10, 25, 50, 100, 250, 500, Inf),
+      na.color = "#F0F0F0"
+    )
+    
+    # Get bounding box
+    bb <- sf::st_bbox(sel)
+    
+    # Create map with data
+    leaflet(options = leafletOptions(zoomControl = TRUE)) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                  opacity = 1, group = "state_focus") %>%
+      addPolygons(
+        data = counties_with_data,
+        fillColor = ~pal(avg_annual_ct),
+        weight = 1, opacity = 1, color = "white",
+        layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
+        label = ~ifelse(
+          is.na(avg_annual_ct),
+          paste0(NAME, " County: No data available"),
+          paste0(NAME, " County: ", 
+                 ifelse(avg_annual_ct == 0, "≤3", as.character(avg_annual_ct)), 
+                 " cases/year")
+        ),
+        highlightOptions = highlightOptions(
+          weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
+        )
+      ) %>%
+      addLegend(
+        position = "bottomright", pal = pal, 
+        values = counties_with_data$avg_annual_ct,
+        title = "Annual<br>Melanoma Cases<br>(County Level)",
+        opacity = 0.7, layerId = "melanoma_legend"
+      ) %>%
+      fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], 
+                lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
   })
   
+  # Dynamic explanation text based on selected visualization
   # Dynamic explanation text based on selected visualization
   output$viz_explanation <- renderUI({
     
     choice <- input$melanoma_view
-    
-    if (is.null(choice) || choice == "none") {
-      return(NULL)
-    }
     
     if (choice == "count") {
       HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
@@ -195,8 +255,11 @@ shinyServer(function(input, output, session) {
   # MAIN MAP OBSERVER - Updates map based on user selections
   # ============================================================================
   
-  observe({
-    
+  observeEvent(c(input$state_select, input$melanoma_view, ignoreNULL=FALSE), {
+    req(input$state_select, input$melanoma_view)
+    # Force immediate evaluation
+    state_val <- input$state_select
+    view_val <- input$melanoma_view
     proxy <- leafletProxy("map")
     
     # Clear all existing layers
@@ -205,31 +268,24 @@ shinyServer(function(input, output, session) {
       clearGroup("melanoma") %>%
       removeControl("melanoma_legend")
     
-    # ========== ALL STATES VIEW ==========
-    if (input$state_select == "All states (USA)") {
-      proxy %>% flyTo(lng = -98.5, lat = 39.8, zoom = 4)
-      
-      if (input$melanoma_view != "none") {
-        showNotification(
-          "Please select a specific state to view melanoma data",
-          type = "warning",
-          duration = 3
-        )
-      }
-      
-      # ========== SPECIFIC STATE VIEW ==========
+    # Zoom to selected state
+    sel <- states_sf[states_sf$NAME == input$state_select, ]
+    # Get bounding box
+    bb <- sf::st_bbox(sel)
+    
+    # Special handling for Michigan - zoom closer to Lower Peninsula
+    if (input$state_select == "Michigan") {
+      proxy %>%
+        addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                    opacity = 1, group = "state_focus") %>%
+        setView(lng = -85.5, lat = 44.5, zoom = 6)  # Custom view for Michigan
     } else {
-      
-      # Zoom to selected state
-      sel <- states_sf[states_sf$NAME == input$state_select, ]
-      if (nrow(sel) > 0) {
-        bb <- sf::st_bbox(sel)
-        proxy %>%
-          addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
-                      opacity = 1, group = "state_focus") %>%
-          fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], 
-                    lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
-      }
+      proxy %>%
+        addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                    opacity = 1, group = "state_focus") %>%
+        fitBounds(lng1 = bb[["xmin"]], lat1 = bb[["ymin"]], 
+                  lng2 = bb[["xmax"]], lat2 = bb[["ymax"]])
+    }
       
       # Get state abbreviation
       state_abbr <- state.abb[match(input$state_select, state.name)]
@@ -519,12 +575,13 @@ shinyServer(function(input, output, session) {
       
     } # End of specific state view
     
-  }) # End of observe block
+  ) # End of observe block
   
   # ============================================================================
   # DATA EXPLORER TAB
   # ============================================================================
   
+  # Melanoma table
   output$data_table <- renderReactable({
     req(melanoma_table)
     reactable(
@@ -541,4 +598,66 @@ shinyServer(function(input, output, session) {
     paste0("Rows: ", nrow(melanoma_table), " | Columns: ", ncol(melanoma_table))
   })
   
-}) # End of shinyServer
+  output$download_data <- downloadHandler(
+    filename = function() {
+      "cleaned_melanoma_table.csv"
+    },
+    content = function(file) {
+      write.csv(melanoma_table, file, row.names = FALSE)
+    }
+  )
+  
+  # UV table
+  output$uv_table <- renderReactable({
+    req(uv_table)
+    reactable(
+      uv_table,
+      searchable = TRUE,
+      filterable = TRUE,
+      sortable = TRUE,
+      pagination = TRUE,
+      defaultPageSize = 10
+    )
+  })
+  
+  output$uv_summary <- renderText({
+    paste0("Rows: ", nrow(uv_table), " | Columns: ", ncol(uv_table))
+  })
+  
+  output$download_uv <- downloadHandler(
+    filename = function() {
+      "cleaned_uv_table.csv"
+    },
+    content = function(file) {
+      write.csv(uv_table, file, row.names = FALSE)
+    }
+  )
+  
+  # County demographics table
+  output$demographics_table <- renderReactable({
+    req(county_demographics)
+    reactable(
+      county_demographics,
+      searchable = TRUE,
+      filterable = TRUE,
+      sortable = TRUE,
+      pagination = TRUE,
+      defaultPageSize = 10
+    )
+  })
+  
+  output$demographics_summary <- renderText({
+    paste0("Rows: ", nrow(county_demographics), " | Columns: ", ncol(county_demographics))
+  })
+  
+  output$download_demographics <- downloadHandler(
+    filename = function() {
+      "cleaned_county_population.csv"
+    },
+    content = function(file) {
+      write.csv(county_demographics, file, row.names = FALSE)
+    }
+  )
+}) 
+
+# End of shinyServer
