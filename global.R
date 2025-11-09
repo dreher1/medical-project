@@ -38,12 +38,6 @@ uv_table$state_uv <- trimws(uv_table$state_uv)
 uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
 View(uv_table)
 
-
-#Code to load population dataset 
-county_population <- read_excel("co-est2024-pop (1).xlsx")
-colnames(county_population)[1] <- "county_state_pop"
-#county_population$county_state_pop <- str_remove(county_population$county_state_pop, "^\\.+\\s*")
-
 # Load cleaned demographics data
 county_demographics <- read.csv("county_demographics_cleaned.csv", stringsAsFactors = FALSE)
 
@@ -114,3 +108,5 @@ cat("\n=== US-Wide Bivariate Breaks ===\n")
 cat("UV breaks (W/m²):", round(us_uv_breaks), "\n")
 cat("Melanoma rate breaks (per 100k):", round(us_melanoma_breaks, 1), "\n")
 cat("Melanoma per white breaks (per 100k white):", round(us_melanoma_per_white_breaks, 1), "\n")
+
+

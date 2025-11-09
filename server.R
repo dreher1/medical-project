@@ -659,5 +659,3 @@ shinyServer(function(input, output, session) {
     }
   )
 }) 
-
-# End of shinyServer
