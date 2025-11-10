@@ -20,13 +20,14 @@ melanoma_table$fips_melanoma <- sprintf("%05d", as.numeric(melanoma_table$fips_m
 ##don't think need code below
 #melanoma_table$avg_annual_ct <- as.numeric(melanoma_table$avg_annual_ct)
 
+
 # Get county shapes (we'll filter by state when needed)
-counties_sf <- tigris::counties(cb = TRUE, year = 2023) |> 
+counties_sf <- tigris::counties(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
 
 
 # Get state shapes
-states_sf <- tigris::states(cb = TRUE, year = 2023) |> 
+states_sf <- tigris::states(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
 keep_names <- setdiff(state.name, "Alaska")
 states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia"), ]
@@ -34,7 +35,6 @@ states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia")
 
 uv_table <- read.csv("cleaned_uv_table.csv", stringsAsFactors = FALSE)
 uv_table$state_uv <- trimws(uv_table$state_uv)
-#uv_table$fips_uv <- sprintf("%05d", as.numeric(uv_table$fips_uv))
 uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
 View(uv_table)
 
