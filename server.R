@@ -279,6 +279,11 @@ shinyServer(function(input, output, session) {
         addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
                     opacity = 1, group = "state_focus") %>%
         setView(lng = -85.5, lat = 44.5, zoom = 6)  # Custom view for Michigan
+    } else if (input$state_select == "Alaska") {
+      proxy %>%
+        addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                    opacity = 1, group = "state_focus") %>%
+        setView(lng = -152, lat = 64, zoom = 3.49)
     } else {
       proxy %>%
         addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 

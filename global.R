@@ -25,8 +25,7 @@ counties_sf <- tigris::counties(cb = TRUE, year = 2020) |>
 # Get state shapes
 states_sf <- tigris::states(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
-keep_names <- setdiff(state.name, "Alaska")
-states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia"), ]
+states_sf <- states_sf[states_sf$NAME %in% c(state.name, "District of Columbia"), ]
 
 
 uv_table <- read.csv("cleaned_uv_table.csv", stringsAsFactors = FALSE)
@@ -58,10 +57,6 @@ county_lookup <- counties_sf %>%
 county_demographics <- county_demographics %>%
   left_join(county_lookup, by = c("county_clean", "state_clean")) %>%
   rename(fips_demo = GEOID)
-
-# ==============================================================================
-# FIX VIRGINIA INDEPENDENT CITIES AND OTHER SPECIAL CASES
-# ==============================================================================
 
 # ==============================================================================
 # FIX VIRGINIA INDEPENDENT CITIES AND OTHER SPECIAL CASES
