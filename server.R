@@ -433,11 +433,15 @@ shinyServer(function(input, output, session) {
             by = c("GEOID" = "fips_uv")
           )
         
+        
         # Create bivariate colors using US-wide breaks
         biv_colors <- create_bivariate_colors(
           counties_with_data$uv_value,
           counties_with_data$age_adj_inc_rate
         )
+      
+          # Override with pure white for missing data (either UV or melanoma)
+        biv_colors[is.na(counties_with_data$age_adj_inc_rate) | is.na(counties_with_data$uv_value)] <- "#FFFFFF"
         
         proxy %>%
           addPolygons(
@@ -480,6 +484,8 @@ shinyServer(function(input, output, session) {
                   <td colspan="3" style="text-align:center; padding-top:5px; font-size:11px;">Higher UV →</td>
                 </tr>
               </table>
+               <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                Light White = Missing/suppressed data</p>
             </div>',
             position = "bottomright",
             layerId = "melanoma_legend"
@@ -565,8 +571,8 @@ shinyServer(function(input, output, session) {
                   <td colspan="3" style="text-align:center; padding-top:5px; font-size:11px;">Higher UV →</td>
                 </tr>
               </table>
-              <p style="font-size: 10px; color: #666; margin-top: 8px;">
-              Darkest = Highest UV + melanoma rate within white populations (US-wide)</p>
+               <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                Light White = Missing/suppressed data</p>
             </div>',
             position = "bottomright",
             layerId = "melanoma_legend"
