@@ -16,17 +16,14 @@ melanoma_table <- read.csv("cleaned_melanoma_table.csv", stringsAsFactors = FALS
 # Ensure FIPS is 5-digit character with leading zeros
 melanoma_table$fips_melanoma <- sprintf("%05d", as.numeric(melanoma_table$fips_melanoma))
 
-# Convert to numeric
-##don't think need code below
-#melanoma_table$avg_annual_ct <- as.numeric(melanoma_table$avg_annual_ct)
 
 # Get county shapes (we'll filter by state when needed)
-counties_sf <- tigris::counties(cb = TRUE, year = 2023) |> 
+counties_sf <- tigris::counties(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
 
 
 # Get state shapes
-states_sf <- tigris::states(cb = TRUE, year = 2023) |> 
+states_sf <- tigris::states(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
 keep_names <- setdiff(state.name, "Alaska")
 states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia"), ]
@@ -34,7 +31,6 @@ states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia")
 
 uv_table <- read.csv("cleaned_uv_table.csv", stringsAsFactors = FALSE)
 uv_table$state_uv <- trimws(uv_table$state_uv)
-#uv_table$fips_uv <- sprintf("%05d", as.numeric(uv_table$fips_uv))
 uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
 View(uv_table)
 
@@ -62,6 +58,47 @@ county_lookup <- counties_sf %>%
 county_demographics <- county_demographics %>%
   left_join(county_lookup, by = c("county_clean", "state_clean")) %>%
   rename(fips_demo = GEOID)
+
+# ==============================================================================
+# FIX VIRGINIA INDEPENDENT CITIES AND OTHER SPECIAL CASES
+# ==============================================================================
+
+# Manual fixes for known mismatches
+manual_fixes <- data.frame(
+  tigris_name = c("Alexandria city", "Bedford city", "Bristol city", "Buena Vista city",
+                  "Charlottesville city", "Chesapeake city", "Colonial Heights city",
+                  "Covington city", "Danville city", "Emporia city", "Fairfax city",
+                  "Falls Church city", "Franklin city", "Fredericksburg city",
+                  "Galax city", "Hampton city", "Harrisonburg city", "Hopewell city",
+                  "Lexington city", "Lynchburg city", "Manassas city", "Manassas Park city",
+                  "Martinsville city", "Newport News city", "Norfolk city", "Norton city",
+                  "Petersburg city", "Poquoson city", "Portsmouth city", "Radford city",
+                  "Richmond city", "Roanoke city", "Salem city", "Staunton city",
+                  "Suffolk city", "Virginia Beach city", "Waynesboro city",
+                  "Williamsburg city", "Winchester city",
+                  "Carson City", "Doña Ana"),
+  state_abbr = c(rep("VA", 39), "NV", "NM"),
+  fips = c("51510", "51515", "51520", "51530", "51540", "51550", "51570",
+           "51580", "51590", "51595", "51600", "51610", "51620", "51630",
+           "51640", "51650", "51660", "51670", "51678", "51680", "51683",
+           "51685", "51690", "51700", "51710", "51720", "51730", "51735",
+           "51740", "51750", "51760", "51770", "51775", "51790", "51800",
+           "51810", "51820", "51830", "51840", "32510", "35013"),
+  stringsAsFactors = FALSE
+)
+
+# Apply manual fixes
+for(i in 1:nrow(manual_fixes)) {
+  county_demographics$fips_demo[
+    toupper(trimws(county_demographics$county_clean)) == toupper(manual_fixes$tigris_name[i]) &
+      county_demographics$state_clean == manual_fixes$state_abbr[i]
+  ] <- manual_fixes$fips[i]
+}
+
+cat("Applied", nrow(manual_fixes), "manual FIPS fixes\n")
+
+# Verify improvement
+cat("Counties with FIPS after manual fixes:", sum(!is.na(county_demographics$fips_demo)), "\n")
 
 # Check results
 cat("Matched:", sum(!is.na(county_demographics$fips_demo)), "out of", nrow(county_demographics), "counties\n")
