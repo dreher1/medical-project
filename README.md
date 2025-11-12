@@ -41,15 +41,17 @@ Contact Information
 
 INSTALLATION INSTRUCTIONS AND VERSION HISTORY:
 
-Beta v0.6.1 (unreleased) - modifying several counties without correct 
-  data mapping in leaflet, fixing bivarate visualizations 
+Beta v0.6.1 (unreleased) - fixed Connecticut mapping so that data populates 
+  correctly, manually fixed counties in Virginia and other states to ensure the 
+  visualization mapping is correct.
   
   --
   
 Previous versions:
 v0.6.0 - added all the remaining tables in the data explorer tab, and added 
   download buttons to the tables. Also removed unnecessary options that the 
-  user would never intend to select on the visualizations page. 
+  user would never intend to select on the visualizations page. Also fixed 
+  zoom issues for several states including Michigan.
 v0.5.2 - Added "Data explorer tabs" and Streamlined Bivarate Data to correct 
   critical logical errors 
 v0.5.1 - Modified Bivarate Data to correct logical errors 
