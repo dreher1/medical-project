@@ -98,6 +98,43 @@ shinyUI(
       )
     ),
     
+    # Statistical Models tab
+    tabPanel(
+      "Statistical Models",
+      fluidPage(
+        h2("Statistical Analysis: UV Exposure and Melanoma Risk"),
+        p("This analysis examines the relationship between UV exposure and melanoma incidence rates across US counties, 
+      accounting for demographic factors."),
+        
+        fluidRow(
+          column(6,
+                 wellPanel(
+                   h4("Model Summary"),
+                   verbatimTextOutput("regression_summary"),
+                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
+                 )
+          ),
+          column(6,
+                 wellPanel(
+                   h4("Key Findings"),
+                   uiOutput("regression_interpretation"),
+                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
+                 )
+          )
+        ),
+        
+        fluidRow(
+          column(12,
+                 wellPanel(
+                   h4("Visualizations"),
+                   plotOutput("regression_plots", height = "500px"),
+                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
+                 )
+          )
+        )
+      )
+    ),
+    
     # Data Explorer tab
     tabPanel(
       "Data Explorer",

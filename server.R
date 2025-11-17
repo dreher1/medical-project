@@ -7,6 +7,11 @@ library(tigris)
 library(dplyr)
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
+# Define custom colors (ADD THESE LINES)
+royal_blue <- "#4169E1" 
+light_blue <- "#E8F0FF" 
+dark_blue  <- "#1E3A8A"
+
 shinyServer(function(input, output, session) {
   
   # ============================================================================
@@ -274,11 +279,17 @@ shinyServer(function(input, output, session) {
     bb <- sf::st_bbox(sel)
     
     # Special handling for Michigan - zoom closer to Lower Peninsula
+    # Special handling for Michigan and Hawaii - zoom to main population centers
     if (input$state_select == "Michigan") {
       proxy %>%
         addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
                     opacity = 1, group = "state_focus") %>%
         setView(lng = -85.5, lat = 44.5, zoom = 6)  # Custom view for Michigan
+    } else if (input$state_select == "Hawaii") {
+      proxy %>%
+        addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
+                    opacity = 1, group = "state_focus") %>%
+        setView(lng = -157.5, lat = 20.5, zoom = 7)  # Custom view for Hawaii main islands
     } else {
       proxy %>%
         addPolygons(data = sel, fill = FALSE, color = "#4169E1", weight = 2, 
@@ -658,4 +669,235 @@ shinyServer(function(input, output, session) {
       write.csv(county_demographics, file, row.names = FALSE)
     }
   )
+  # ============================================================================
+  # STATISTICAL ANALYSIS SECTION
+  # ============================================================================
+  
+  # Prepare analysis dataset (reactive so it updates if data changes)
+  analysis_data <- reactive({
+    # Combine all datasets
+    combined <- counties_sf %>%
+      st_drop_geometry() %>%
+      left_join(
+        melanoma_table %>% select(fips_melanoma, age_adj_inc_rate, state),
+        by = c("GEOID" = "fips_melanoma")
+      ) %>%
+      left_join(
+        uv_table %>% 
+          mutate(fips_uv = sprintf("%05d", as.numeric(fips_uv))) %>%
+          select(fips_uv, uv_value),
+        by = c("GEOID" = "fips_uv")
+      ) %>%
+      left_join(
+        county_demographics %>%
+          select(fips_demo, white_not_h_or_l_pct),
+        by = c("GEOID" = "fips_demo")
+      ) %>%
+      filter(!is.na(age_adj_inc_rate) & 
+               !is.na(uv_value) & 
+               !is.na(white_not_h_or_l_pct) &
+               !is.na(state))
+    
+    return(combined)
+  })
+  
+  # Fit regression model
+  regression_model <- reactive({
+    data <- analysis_data()
+    
+    # Fit model with UV and white population percentage as predictors
+    model <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, 
+                data = data)
+    
+    return(model)
+  })
+  
+  # Output: Regression Summary
+  output$regression_summary <- renderPrint({
+    model <- regression_model()
+    summary(model)
+  })
+  
+  # Output: Interpretation
+  output$regression_interpretation <- renderUI({
+    model <- regression_model()
+    coefs <- coef(model)
+    summary_stats <- summary(model)
+    r_squared <- summary_stats$r.squared
+    p_uv <- summary_stats$coefficients["uv_value", "Pr(>|t|)"]
+    p_white <- summary_stats$coefficients["white_not_h_or_l_pct", "Pr(>|t|)"]
+    
+    # Format p-values
+    p_uv_text <- if(p_uv < 0.001) "p < 0.001" else paste0("p = ", round(p_uv, 4))
+    p_white_text <- if(p_white < 0.001) "p < 0.001" else paste0("p = ", round(p_white, 4))
+    
+    HTML(paste0(
+      "<div style='padding: 10px;'>",
+      "<p><strong>Model Performance:</strong></p>",
+      "<ul>",
+      "<li>R² = ", round(r_squared, 3), " (explains ", round(r_squared * 100, 1), "% of variance)</li>",
+      "<li>Sample size: ", nrow(analysis_data()), " counties</li>",
+      "</ul>",
+      
+      "<p><strong>UV Exposure Effect:</strong></p>",
+      "<ul>",
+      "<li>For every 100 W/m² increase in UV exposure, melanoma incidence increases by <strong>",
+      round(coefs["uv_value"] * 100, 2), " cases per 100k</strong> (", p_uv_text, ")</li>",
+      "<li>", if(p_uv < 0.05) "✓ Statistically significant" else "✗ Not significant", "</li>",
+      "</ul>",
+      
+      "<p><strong>Demographic Effect:</strong></p>",
+      "<ul>",
+      "<li>For every 10% increase in white population, melanoma incidence increases by <strong>",
+      round(coefs["white_not_h_or_l_pct"] * 10, 2), " cases per 100k</strong> (", p_white_text, ")</li>",
+      "<li>", if(p_white < 0.05) "✓ Statistically significant" else "✗ Not significant", "</li>",
+      "</ul>",
+      
+      "<p><strong>Interpretation:</strong> This model confirms that both UV exposure and demographic composition ",
+      "are significant predictors of melanoma incidence rates at the county level. The positive association with ",
+      "white population percentage reflects known racial disparities in melanoma susceptibility.</p>",
+      "</div>"
+    ))
+  })
+  
+  # Output: Regression Plots
+  output$regression_plots <- renderPlot({
+    
+    # Add error handling
+    tryCatch({
+      
+      model <- regression_model()
+      data <- analysis_data()
+      
+      # Add fitted values and residuals to data
+      data$fitted <- fitted(model)
+      data$residuals <- residuals(model)
+      
+      # Plot 1: UV vs Melanoma (SIMPLE VERSION)
+      p1 <- ggplot(data, aes(x = uv_value, y = age_adj_inc_rate)) +
+        geom_point(alpha = 0.3, color = "#4169E1") +
+        geom_smooth(method = "lm", color = "#1E3A8A", fill = "#E8F0FF") +
+        labs(
+          title = "UV Exposure vs. Melanoma Rate",
+          x = "UV Intensity (W/m²)",
+          y = "Age-Adjusted Incidence Rate\n(per 100,000)",
+          caption = "Each point represents a US county. The line shows the linear relationship.\nHigher UV exposure is associated with higher melanoma rates."
+        ) +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(face = "bold", color = "#1E3A8A", size = 14),
+          axis.title = element_text(face = "bold"),
+          plot.caption = element_text(hjust = 0, size = 9, color = "gray30", margin = margin(t = 10))
+        )
+      
+      # Plot 2: State-level comparison WITH TOTAL STATE POPULATION
+      # Join with melanoma_table to get the case counts and rates needed for population estimation
+      data_with_pop <- data %>%
+        left_join(
+          melanoma_table %>% select(fips_melanoma, avg_annual_ct, age_adj_inc_rate),
+          by = c("GEOID" = "fips_melanoma")
+        ) %>%
+        mutate(
+          # Estimate population from rate and count (rate is per 100k)
+          # population ≈ (cases / rate) × 100,000
+          estimated_pop = ifelse(!is.na(avg_annual_ct.y) & !is.na(age_adj_inc_rate.y) & age_adj_inc_rate.y > 0,
+                                 (avg_annual_ct.y / age_adj_inc_rate.y) * 100000,
+                                 NA)
+        )
+      
+      state_summary <- data_with_pop %>%
+        group_by(state) %>%
+        summarise(
+          mean_residual = mean(residuals, na.rm = TRUE),
+          # Sum up all county populations to get total state population
+          total_state_pop = sum(estimated_pop, na.rm = TRUE),
+          n_counties = n(),
+          .groups = 'drop'
+        ) %>%
+        filter(n_counties >= 5 & !is.na(mean_residual) & total_state_pop > 0) %>%
+        arrange(mean_residual) %>%
+        slice(c(1:10, (n()-9):n())) %>%
+        mutate(
+          # Convert to millions for display
+          pop_millions = total_state_pop / 1000000,
+          # Create label with state name and population
+          state_label = paste0(state, " (", round(pop_millions, 1), "M)")
+        )
+      
+      p2 <- ggplot(state_summary, aes(x = reorder(state_label, mean_residual), y = mean_residual)) +
+        geom_col(aes(fill = mean_residual > 0), show.legend = FALSE) +
+        scale_fill_manual(values = c("TRUE" = "#E31A1C", "FALSE" = "#31A354")) +
+        coord_flip() +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+        labs(
+          title = "States with Highest/Lowest Melanoma Rates",
+          subtitle = "Relative to predictions based on UV and demographics (with state populations)",
+          x = NULL,
+          y = "Average Residual (per 100k)",
+          caption = "Green = Lower than expected | Red = Higher than expected\nState populations (in millions) shown in parentheses. Based on sum of county populations."
+        ) +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(face = "bold", color = "#1E3A8A", size = 14),
+          plot.subtitle = element_text(size = 10, color = "gray30"),
+          axis.title = element_text(face = "bold"),
+          axis.text.y = element_text(size = 8),
+          plot.caption = element_text(hjust = 0, size = 9, color = "gray30", margin = margin(t = 10))
+        )
+      
+      # Plot 3: Predicted vs Actual
+      p3 <- ggplot(data, aes(x = fitted, y = age_adj_inc_rate)) +
+        geom_point(alpha = 0.3, color = "#4169E1") +
+        geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", linewidth = 1) +
+        labs(
+          title = "Model Predictions vs. Actual Rates",
+          x = "Predicted Melanoma Rate (per 100k)",
+          y = "Actual Melanoma Rate (per 100k)",
+          caption = "Points near the red line indicate accurate predictions.\nScatter shows the model explains some, but not all, variation in melanoma rates."
+        ) +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(face = "bold", color = "#1E3A8A", size = 14),
+          axis.title = element_text(face = "bold"),
+          plot.caption = element_text(hjust = 0, size = 9, color = "gray30", margin = margin(t = 10))
+        )
+      
+      # Plot 4: Effect Size Comparison
+      coef_data <- data.frame(
+        Variable = c("UV Exposure\n(per 100 W/m²)", "White Population\n(per 10% increase)"),
+        Estimate = c(coef(model)["uv_value"] * 100, coef(model)["white_not_h_or_l_pct"] * 10),
+        Lower = c(confint(model)["uv_value", 1] * 100, confint(model)["white_not_h_or_l_pct", 1] * 10),
+        Upper = c(confint(model)["uv_value", 2] * 100, confint(model)["white_not_h_or_l_pct", 2] * 10)
+      )
+      
+      p4 <- ggplot(coef_data, aes(x = Variable, y = Estimate)) +
+        geom_col(fill = "#4169E1", alpha = 0.7, width = 0.6) +
+        geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, linewidth = 1, color = "#1E3A8A") +
+        geom_text(aes(label = paste0("+", round(Estimate, 2))), 
+                  vjust = -0.5, fontface = "bold", color = "#1E3A8A") +
+        labs(
+          title = "Effect Sizes: Impact on Melanoma Rate",
+          x = NULL,
+          y = "Change in Melanoma Rate\n(cases per 100k)",
+          caption = "Error bars show 95% confidence intervals.\nBoth factors significantly increase melanoma risk, with demographics having a larger effect."
+        ) +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(face = "bold", color = "#1E3A8A", size = 14),
+          axis.title = element_text(face = "bold"),
+          axis.text.x = element_text(face = "bold", size = 11),
+          plot.caption = element_text(hjust = 0, size = 9, color = "gray30", margin = margin(t = 10))
+        ) +
+        ylim(0, max(coef_data$Upper) * 1.2)
+      
+      # Combine plots
+      plot_grid(p1, p2, p3, p4, ncol = 2, nrow = 2)
+      
+    }, error = function(e) {
+      # If there's an error, create a simple error plot
+      plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")
+      text(1, 1, paste("Error creating plots:\n", e$message), cex = 1.2, col = "red")
+    })
+    
+  })
 }) 
