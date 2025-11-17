@@ -25,14 +25,13 @@ counties_sf <- tigris::counties(cb = TRUE, year = 2020) |>
 # Get state shapes
 states_sf <- tigris::states(cb = TRUE, year = 2020) |> 
   sf::st_transform(4326)
-keep_names <- setdiff(state.name, "Alaska")
-states_sf <- states_sf[states_sf$NAME %in% c(keep_names, "District of Columbia"), ]
+states_sf <- states_sf[states_sf$NAME %in% c(state.name, "District of Columbia"), ]
 
 
 uv_table <- read.csv("cleaned_uv_table.csv", stringsAsFactors = FALSE)
 uv_table$state_uv <- trimws(uv_table$state_uv)
 uv_table$uv_value <- as.numeric(uv_table$uv_whm2)
-View(uv_table)
+
 
 # Load cleaned demographics data
 county_demographics <- read.csv("county_demographics_cleaned.csv", stringsAsFactors = FALSE)
@@ -65,32 +64,36 @@ county_demographics <- county_demographics %>%
 
 # Manual fixes for known mismatches
 manual_fixes <- data.frame(
-  tigris_name = c("Alexandria city", "Bedford city", "Bristol city", "Buena Vista city",
-                  "Charlottesville city", "Chesapeake city", "Colonial Heights city",
-                  "Covington city", "Danville city", "Emporia city", "Fairfax city",
-                  "Falls Church city", "Franklin city", "Fredericksburg city",
-                  "Galax city", "Hampton city", "Harrisonburg city", "Hopewell city",
-                  "Lexington city", "Lynchburg city", "Manassas city", "Manassas Park city",
-                  "Martinsville city", "Newport News city", "Norfolk city", "Norton city",
-                  "Petersburg city", "Poquoson city", "Portsmouth city", "Radford city",
-                  "Richmond city", "Roanoke city", "Salem city", "Staunton city",
-                  "Suffolk city", "Virginia Beach city", "Waynesboro city",
-                  "Williamsburg city", "Winchester city",
-                  "Carson City", "Doña Ana"),
-  state_abbr = c(rep("VA", 39), "NV", "NM"),
+  demo_county_clean = c("ALEXANDRIA", "BEDFORD", "BRISTOL", "BUENA VISTA",
+                        "CHARLOTTESVILLE", "CHESAPEAKE", "COLONIAL HEIGHTS",
+                        "COVINGTON", "DANVILLE", "EMPORIA", "FAIRFAX",
+                        "FALLS CHURCH", "FRANKLIN", "FREDERICKSBURG",
+                        "GALAX", "HAMPTON", "HARRISONBURG", "HOPEWELL",
+                        "LEXINGTON", "LYNCHBURG", "MANASSAS", "MANASSAS PARK",
+                        "MARTINSVILLE", "NEWPORT NEWS", "NORFOLK", "NORTON",
+                        "PETERSBURG", "POQUOSON", "PORTSMOUTH", "RADFORD",
+                        "RICHMOND", "ROANOKE", "SALEM", "STAUNTON",
+                        "SUFFOLK", "VIRGINIA BEACH", "WAYNESBORO",
+                        "WILLIAMSBURG", "WINCHESTER",
+                        "BALTIMORE", "CARSON", "DONA ANA", "LA SALLE", "ST. LOUIS"),
+  state_abbr = c(rep("VA", 39), "MD", "NV", "NM", "LA", "MO"),
   fips = c("51510", "51515", "51520", "51530", "51540", "51550", "51570",
            "51580", "51590", "51595", "51600", "51610", "51620", "51630",
            "51640", "51650", "51660", "51670", "51678", "51680", "51683",
            "51685", "51690", "51700", "51710", "51720", "51730", "51735",
            "51740", "51750", "51760", "51770", "51775", "51790", "51800",
-           "51810", "51820", "51830", "51840", "32510", "35013"),
+           "51810", "51820", "51830", "51840",
+           "24510", "32510", "35013", "22059", "29510"),
   stringsAsFactors = FALSE
 )
 
-# Apply manual fixes
+# Apply manual fixes - match on the base name without " CITY" suffix
 for(i in 1:nrow(manual_fixes)) {
+  # Remove " CITY" from county_clean for matching
+  base_name <- sub(" CITY$", "", county_demographics$county_clean)
+  
   county_demographics$fips_demo[
-    toupper(trimws(county_demographics$county_clean)) == toupper(manual_fixes$tigris_name[i]) &
+    base_name == manual_fixes$demo_county_clean[i] &
       county_demographics$state_clean == manual_fixes$state_abbr[i]
   ] <- manual_fixes$fips[i]
 }
