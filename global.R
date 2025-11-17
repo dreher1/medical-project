@@ -151,6 +151,7 @@ cat("Melanoma rate breaks (per 100k):", round(us_melanoma_breaks, 1), "\n")
 cat("Melanoma per white breaks (per 100k white):", round(us_melanoma_per_white_breaks, 1), "\n")
 
 
+#___________________________________________________________________
 
 # Load occupation data
 occupation_data_raw <- read.csv("ACSST5Y2021.S2401-Data.csv", stringsAsFactors = FALSE, skip = 1)

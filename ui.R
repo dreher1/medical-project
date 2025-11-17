@@ -148,9 +148,9 @@ shinyUI(
         hr(),
         
         wellPanel(
-          h3("2. Simpson's Paradox Demonstration"),
-          uiOutput("simpsons_explanation"),
-          plotOutput("simpsons_paradox_plot", height = "550px")
+          h3("2. Geographic Confounding"),  # CHANGED from "Simpson's Paradox"
+          uiOutput("geographic_explanation"),  # CHANGED
+          plotOutput("geographic_confounding_plot", height = "550px")  # CHANGED
         ),
         
         hr(),
@@ -162,20 +162,9 @@ shinyUI(
         ),
         
         hr(),
-        
+      
         wellPanel(
-          h3("4. Stratified Analysis by White Population"),
-          p("Controlling for racial composition reveals true UV-melanoma relationship."),
-          plotOutput("stratified_plot", height = "500px"),
-          br(),
-          h4("Correlation by Quartile"),
-          reactableOutput("stratified_table")
-        ),
-        
-        hr(),
-        
-        wellPanel(
-          h3("5. Model Comparison: Variance Decomposition"),
+          h3("4. Model Comparison: Variance Decomposition"),
           p("How much melanoma variance is explained by each variable?"),
           plotOutput("variance_decomposition", height = "450px")
         ),
@@ -183,29 +172,21 @@ shinyUI(
         hr(),
         
         wellPanel(
-          h3("6. Statistical Interaction: UV × White Population"),
-          uiOutput("interaction_explanation"),
-          plotOutput("interaction_plot", height = "550px")
-        ),
-        
-        hr(),
-        
-        wellPanel(
-          h3("7. Model Interpretation & Clinical Significance"),
+          h3("5. Model Interpretation & Clinical Significance"),
           uiOutput("model_interpretation")
         ),
         
         hr(),
         
         wellPanel(
-          h3("8. Full Regression Model Details"),
+          h3("6. Full Regression Model Details"),
           verbatimTextOutput("regression_summary")
         ),
         
         hr(),
         
         wellPanel(
-          h3("9. Occupational Exposure Analysis"),
+          h3("7. Occupational Exposure Analysis"),
           p("Does the percentage of outdoor workers explain additional melanoma variance?"),
           verbatimTextOutput("occupation_correlation"),
           hr(),
@@ -216,17 +197,30 @@ shinyUI(
         hr(),
         
         wellPanel(
-          h3("10. UV × Outdoor Occupation Interaction"),
+          h3("8. UV × Outdoor Occupation Interaction"),
           p("Do counties with more outdoor workers show stronger UV-melanoma relationships?"),
           plotOutput("occupation_uv_plot", height = "550px")
+        ),
+        
+        
+        hr(),
+        wellPanel(
+          h3("9. Occupational Exposure Analysis"),
+          uiOutput("occupation_interpretation"),
+          hr(),
+          h4("Correlations with Melanoma Rate"),
+          verbatimTextOutput("occupation_correlation"),
+          hr(),
+          h4("Regression Model Comparison"),
+          verbatimTextOutput("occupation_regression")
         ),
         
         hr(),
         
         wellPanel(
-          h3("11. Risk Heatmap: Demographics × Occupation"),
-          p("Highest risk counties: High white population + High outdoor work percentage"),
-          plotOutput("occupation_demographic_heatmap", height = "500px")
+          h3("12. Sensitivity Analysis: High White Population Counties Only"),
+          p("Does the outdoor work paradox persist when demographics are controlled?"),
+          verbatimTextOutput("occupation_sensitivity")
         )
       )
     )
