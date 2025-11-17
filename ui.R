@@ -98,43 +98,6 @@ shinyUI(
       )
     ),
     
-    # Statistical Models tab
-    tabPanel(
-      "Statistical Models",
-      fluidPage(
-        h2("Statistical Analysis: UV Exposure and Melanoma Risk"),
-        p("This analysis examines the relationship between UV exposure and melanoma incidence rates across US counties, 
-      accounting for demographic factors."),
-        
-        fluidRow(
-          column(6,
-                 wellPanel(
-                   h4("Model Summary"),
-                   verbatimTextOutput("regression_summary"),
-                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
-                 )
-          ),
-          column(6,
-                 wellPanel(
-                   h4("Key Findings"),
-                   uiOutput("regression_interpretation"),
-                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
-                 )
-          )
-        ),
-        
-        fluidRow(
-          column(12,
-                 wellPanel(
-                   h4("Visualizations"),
-                   plotOutput("regression_plots", height = "500px"),
-                   style = paste0("background-color: white; border: 2px solid ", royal_blue, ";")
-                 )
-          )
-        )
-      )
-    ),
-    
     # Data Explorer tab
     tabPanel(
       "Data Explorer",
@@ -169,6 +132,102 @@ shinyUI(
         textOutput("demographics_summary"),
         downloadButton("download_demographics", "Download County Population Data (CSV)"),
         br()
+      )
+    ),
+    tabPanel(
+      "Statistical Analysis",
+      fluidPage(
+        h2("Statistical Analysis: UV vs Melanoma Relationship"),
+        p("Comprehensive analysis examining confounding, interactions, and model diagnostics."),
+        
+        wellPanel(
+          h3("1. Correlation Summary"),
+          verbatimTextOutput("correlation_summary")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("2. Simpson's Paradox Demonstration"),
+          uiOutput("simpsons_explanation"),
+          plotOutput("simpsons_paradox_plot", height = "550px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("3. The Confounding Problem"),
+          p("White population percentage is a stronger predictor than UV."),
+          plotOutput("confounding_plot", height = "500px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("4. Stratified Analysis by White Population"),
+          p("Controlling for racial composition reveals true UV-melanoma relationship."),
+          plotOutput("stratified_plot", height = "500px"),
+          br(),
+          h4("Correlation by Quartile"),
+          reactableOutput("stratified_table")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("5. Model Comparison: Variance Decomposition"),
+          p("How much melanoma variance is explained by each variable?"),
+          plotOutput("variance_decomposition", height = "450px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("6. Statistical Interaction: UV × White Population"),
+          uiOutput("interaction_explanation"),
+          plotOutput("interaction_plot", height = "550px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("7. Model Interpretation & Clinical Significance"),
+          uiOutput("model_interpretation")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("8. Full Regression Model Details"),
+          verbatimTextOutput("regression_summary")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("9. Occupational Exposure Analysis"),
+          p("Does the percentage of outdoor workers explain additional melanoma variance?"),
+          verbatimTextOutput("occupation_correlation"),
+          hr(),
+          h4("Regression Model Comparison"),
+          verbatimTextOutput("occupation_regression")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("10. UV × Outdoor Occupation Interaction"),
+          p("Do counties with more outdoor workers show stronger UV-melanoma relationships?"),
+          plotOutput("occupation_uv_plot", height = "550px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("11. Risk Heatmap: Demographics × Occupation"),
+          p("Highest risk counties: High white population + High outdoor work percentage"),
+          plotOutput("occupation_demographic_heatmap", height = "500px")
+        )
       )
     )
   )

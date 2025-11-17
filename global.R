@@ -1,4 +1,3 @@
-# global.R - Loads once when app starts
 library(shiny)
 library(markdown)
 library(leaflet)
@@ -7,6 +6,8 @@ library(sf)
 library(tigris)
 library(dplyr)
 library(readxl)
+
+select <- dplyr::select
 
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
@@ -150,3 +151,38 @@ cat("Melanoma rate breaks (per 100k):", round(us_melanoma_breaks, 1), "\n")
 cat("Melanoma per white breaks (per 100k white):", round(us_melanoma_per_white_breaks, 1), "\n")
 
 
+
+# Load occupation data
+occupation_data_raw <- read.csv("ACSST5Y2021.S2401-Data.csv", stringsAsFactors = FALSE, skip = 1)
+
+# Extract outdoor occupation data
+occupation_data <- occupation_data_raw %>%
+  mutate(
+    # Clean FIPS codes
+    fips_occupation = gsub("0500000US", "", Geography),
+    
+    # Total employed population
+    total_employed = as.numeric(Estimate..Total..Civilian.employed.population.16.years.and.over),
+    
+    # Natural resources, construction, and maintenance occupations (TOTAL)
+    outdoor_total = as.numeric(Estimate..Total..Civilian.employed.population.16.years.and.over..Natural.resources..construction..and.maintenance.occupations.),
+    
+    # Breakdown by type:
+    farming_fishing_forestry = as.numeric(Estimate..Total..Civilian.employed.population.16.years.and.over..Natural.resources..construction..and.maintenance.occupations...Farming..fishing..and.forestry.occupations),
+    
+    construction_extraction = as.numeric(Estimate..Total..Civilian.employed.population.16.years.and.over..Natural.resources..construction..and.maintenance.occupations...Construction.and.extraction.occupations),
+    
+    # Calculate percentages
+    outdoor_pct = (outdoor_total / total_employed) * 100,
+    farming_pct = (farming_fishing_forestry / total_employed) * 100,
+    construction_pct = (construction_extraction / total_employed) * 100
+  ) %>%
+  dplyr::select(fips_occupation, total_employed, outdoor_total, outdoor_pct, 
+                farming_fishing_forestry, farming_pct, 
+                construction_extraction, construction_pct)
+
+cat("\n=== OCCUPATION DATA SUMMARY ===\n")
+cat("Counties with occupation data:", nrow(occupation_data), "\n")
+cat("Mean outdoor occupation %:", round(mean(occupation_data$outdoor_pct, na.rm = TRUE), 2), "%\n")
+cat("Range:", round(min(occupation_data$outdoor_pct, na.rm = TRUE), 2), "% to", 
+    round(max(occupation_data$outdoor_pct, na.rm = TRUE), 2), "%\n")
