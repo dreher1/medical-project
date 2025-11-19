@@ -73,6 +73,32 @@ shinyServer(function(input, output, session) {
     
     return(colors)
   }
+  # Healthcare Access Bivariate: MD Availability × Melanoma Rate
+  create_md_bivariate_colors <- function(md_values, melanoma_values) {
+    
+    # Use US-wide breaks (calculated in global.R)
+    md_class <- cut(md_values, breaks = us_md_breaks, labels = 1:3, include.lowest = TRUE)
+    mel_class <- cut(melanoma_values, breaks = us_melanoma_breaks, labels = 1:3, include.lowest = TRUE)
+    
+    # Color matrix (reversed logic: high MD + low melanoma = good outcome)
+    color_matrix <- matrix(c(
+      "#E8E8E8", "#ACE4E4", "#5AC8C8",  # Low melanoma
+      "#DFBFD8", "#A28DA8", "#637994",  # Med melanoma  
+      "#BE64AC", "#8C62AA", "#3B4994"   # High melanoma
+    ), nrow = 3, byrow = TRUE)
+    
+    # Map to colors
+    colors <- rep("#F0F0F0", length(md_values))
+    for (i in seq_along(colors)) {
+      if (!is.na(md_class[i]) && !is.na(mel_class[i])) {
+        row_idx <- as.numeric(mel_class[i])
+        col_idx <- as.numeric(md_class[i])
+        colors[i] <- color_matrix[row_idx, col_idx]
+      }
+    }
+    
+    return(colors)
+  }
   
   # ============================================================================
   # HOME TAB OUTPUTS
@@ -249,6 +275,30 @@ shinyServer(function(input, output, session) {
        This helps identify counties where melanoma disproportionately affects the white population, which may indicate 
        environmental, behavioral, or screening disparities that warrant targeted public health interventions.
      </div>")
+    } else if (choice == "md_availability") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+     <strong>About Physician Availability:</strong><br>
+     This map displays the number of physicians (MDs) per 100,000 population for each county. 
+     Higher values indicate better healthcare access. This data comes from the md_availability dataset 
+     and may help explain melanoma detection and diagnosis patterns. Gray counties indicate missing data.
+   </div>")
+    } else if (choice == "bivariate_md") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+         <strong>About Healthcare Access Bivariate Mapping:</strong><br>
+         This map shows the relationship between physician availability and melanoma rates using a 3×3 color scheme.
+         Counties are classified relative to <strong>national averages</strong>.
+         <br><br>
+         <strong>Interpretation:</strong>
+         <ul style='margin: 10px 0;'>
+           <li><strong>Dark blue/purple (top-right):</strong> High MD access + High melanoma = Good detection/screening</li>
+           <li><strong>Dark blue/purple (top-left):</strong> Low MD access + High melanoma = Healthcare disparity concern</li>
+           <li><strong>Light cyan (bottom-right):</strong> High MD access + Low melanoma = Successful prevention/early detection</li>
+           <li><strong>Light gray (bottom-left):</strong> Low MD access + Low melanoma = May reflect underdiagnosis</li>
+         </ul>
+         <strong>Why this matters:</strong> Areas with high melanoma rates but low physician access may have delayed diagnoses 
+         and worse outcomes, while areas with high MD access may detect more cases earlier.
+       </div>")
+    } else if (choice == "md_availability") {
     } else {
       return(NULL)
     }
@@ -585,9 +635,128 @@ shinyServer(function(input, output, session) {
             position = "bottomright",
             layerId = "melanoma_legend"
           )
+        
+      }
+      # ========== PHYSICIAN AVAILABILITY ==========
+      if (input$melanoma_view == "md_availability") {
+        
+        # Join MD data (FIPS already formatted in global.R)
+        counties_with_data <- state_counties %>%
+          left_join(
+            md_availability %>% 
+              select(fips_md, md_rate_per_100k),
+            by = c("GEOID" = "fips_md")
+          )
+        
+        # Check if data exists
+        if (!"md_rate_per_100k" %in% colnames(counties_with_data)) {
+          showNotification("MD availability data column not found", type = "error")
+          return()
+        }
+        
+        pal <- colorBin(
+          palette = "YlGnBu",
+          domain = counties_with_data$md_rate_per_100k,
+          bins = c(0, 50, 100, 200, 300, 500, 1000, 4600),
+          na.color = "#F0F0F0"
+        )
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = ~pal(md_rate_per_100k),
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
+            label = ~ifelse(
+              is.na(md_rate_per_100k),
+              paste0(NAME, " County: No MD data available"),
+              paste0(NAME, " County: ", round(md_rate_per_100k, 1), " MDs per 100k")
+            ),
+            highlightOptions = highlightOptions(
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
+            )
+          ) %>%
+          addLegend(
+            position = "bottomright", pal = pal,
+            values = counties_with_data$md_rate_per_100k,
+            title = "Physicians<br>per 100,000<br>Population",
+            opacity = 0.7, layerId = "melanoma_legend"
+          )
       }
       
-    } # End of specific state view
+      # ========== BIVARIATE: MD AVAILABILITY × MELANOMA RATE ==========
+      if (input$melanoma_view == "bivariate_md") {
+        
+        counties_with_data <- state_counties %>%
+          left_join(
+            melanoma_table %>% select(fips_melanoma, age_adj_inc_rate),
+            by = c("GEOID" = "fips_melanoma")
+          ) %>%
+          left_join(
+            md_availability %>% select(fips_md, md_rate_per_100k),
+            by = c("GEOID" = "fips_md")
+          )
+        
+        # Create bivariate colors using US-wide breaks
+        biv_colors <- create_md_bivariate_colors(
+          counties_with_data$md_rate_per_100k,
+          counties_with_data$age_adj_inc_rate
+        )
+        
+        # Override with pure white for missing data
+        biv_colors[is.na(counties_with_data$age_adj_inc_rate) | is.na(counties_with_data$md_rate_per_100k)] <- "#FFFFFF"
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = biv_colors,
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
+            label = ~paste0(
+              NAME, " County",
+              "<br>MDs: ", ifelse(is.na(md_rate_per_100k), "No data", paste0(round(md_rate_per_100k, 1), " per 100k")),
+              "<br>Melanoma: ", ifelse(is.na(age_adj_inc_rate), "Suppressed", 
+                                       paste0(round(age_adj_inc_rate, 1), " per 100k"))
+            ) %>% lapply(htmltools::HTML),
+            highlightOptions = highlightOptions(
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
+            )
+          ) %>%
+          addControl(
+            html = '<div style="background: white; padding: 12px; border: 2px solid #4169E1; border-radius: 5px;">
+              <strong style="font-size: 13px;">MD Access × Melanoma Rate</strong><br>
+              <p style="font-size: 10px; margin: 5px 0;">(National scale)</p>
+              <table style="border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width:28px;height:28px;background:#BE64AC;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#8C62AA;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#3B4994;border:1px solid white"></td>
+                  <td rowspan="3" style="writing-mode: vertical-lr; transform: rotate(180deg); padding-left:8px; font-size:11px;">Higher Melanoma →</td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#DFBFD8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#A28DA8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#637994;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td style="width:28px;height:28px;background:#E8E8E8;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#ACE4E4;border:1px solid white"></td>
+                  <td style="width:28px;height:28px;background:#5AC8C8;border:1px solid white"></td>
+                </tr>
+                <tr>
+                  <td colspan="3" style="text-align:center; padding-top:5px; font-size:11px;">Higher MD Access →</td>
+                </tr>
+              </table>
+               <p style="font-size: 10px; color: #666; margin-top: 8px;">
+                Light White = Missing/suppressed data</p>
+            </div>',
+            position = "bottomright",
+            layerId = "melanoma_legend"
+          )
+      }
+      
+  } # End of specific state view
+  
     
   ) # End of observe block
   
