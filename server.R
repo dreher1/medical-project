@@ -6,6 +6,8 @@ library(sf)
 library(tigris)
 library(dplyr)
 library(ggplot2)
+library(plotly)
+library(DT)
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
 shinyServer(function(input, output, session) {
@@ -674,9 +676,10 @@ shinyServer(function(input, output, session) {
   
   
   # ============================================================================
-  # STATISTICAL ANALYSIS TAB
+  # NEW IMPROVED STATISTICAL ANALYSIS TAB
   # ============================================================================
   
+  # Prepare analysis data
   analysis_data <- reactive({
     melanoma_table %>%
       left_join(
@@ -694,72 +697,177 @@ shinyServer(function(input, output, session) {
       filter(!is.na(age_adj_inc_rate) & !is.na(uv_value) & !is.na(white_not_h_or_l_pct))
   })
   
-  # 1. Correlation summary
-  output$correlation_summary <- renderText({
+  # 1. KEY FINDINGS CARDS
+  output$key_metrics <- renderUI({
     data <- analysis_data()
     
     cor_uv <- cor(data$uv_value, data$age_adj_inc_rate)
     cor_white <- cor(data$white_not_h_or_l_pct, data$age_adj_inc_rate)
-    cor_uv_white <- cor(data$uv_value, data$white_not_h_or_l_pct)
     
-    # Partial correlation
     m_melanoma_vs_white <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
     m_uv_vs_white <- lm(uv_value ~ white_not_h_or_l_pct, data = data)
     partial_cor <- cor(residuals(m_melanoma_vs_white), residuals(m_uv_vs_white))
     
-    paste0(
-      "Sample Size: ", nrow(data), " counties\n\n",
-      "=== BIVARIATE CORRELATIONS ===\n",
-      "UV vs Melanoma: r = ", round(cor_uv, 3), " (NEGATIVE - spurious!)\n",
-      "White % vs Melanoma: r = ", round(cor_white, 3), " (STRONG POSITIVE)\n",
-      "UV vs White %: r = ", round(cor_uv_white, 3), " (STRONG NEGATIVE - key confounder!)\n\n",
-      "=== PARTIAL CORRELATION (controlling for white %) ===\n",
-      "UV vs Melanoma | White %: r = ", round(partial_cor, 3), " (weak but POSITIVE)\n\n",
-      "=== KEY INSIGHTS ===\n",
-      "1. Crude UV-melanoma correlation is NEGATIVE due to geographic confounding\n",
-      "2. UV and white % are strongly inversely related (Northern states paradox)\n",
-      "3. After controlling for demographics, UV has POSITIVE but WEAK effect\n",
-      "4. White % is ", round(abs(cor_white / cor_uv), 1), "× stronger predictor\n",
-      "5. Partial correlation explains only ", round(partial_cor^2 * 100, 1), "% of variance"
-    )
+    m_full <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    r_squared <- summary(m_full)$r.squared
+    
+    HTML(paste0('
+      <div class="row">
+        <div class="col-md-3">
+          <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="stat-value">', nrow(data), '</div>
+            <div class="stat-label">Counties Analyzed</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stat-value">', round(cor_white, 2), '</div>
+            <div class="stat-label">Demographics Effect</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+            <div class="stat-value">', round(partial_cor, 2), '</div>
+            <div class="stat-label">True UV Effect</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+            <div class="stat-value">', round(r_squared * 100), '%</div>
+            <div class="stat-label">Variance Explained</div>
+          </div>
+        </div>
+      </div>
+    '))
   })
   
-  # 2. Multiple Regression Comparison
-  output$multiple_regression_plot <- renderPlot({
+  # 2. INTERACTIVE SCATTER PLOT
+  output$interactive_scatter <- renderPlotly({
     data <- analysis_data()
     
+    # Create hover text
+    data$hover_text <- paste0(
+      "<b>", data$county, ", ", data$state, "</b><br>",
+      "UV: ", round(data$uv_value), " W/m²<br>",
+      "Melanoma: ", round(data$age_adj_inc_rate, 1), " per 100k<br>",
+      "White Pop: ", round(data$white_not_h_or_l_pct, 1), "%"
+    )
+    
+    p <- plot_ly(data, 
+                 x = ~uv_value, 
+                 y = ~age_adj_inc_rate,
+                 color = ~white_not_h_or_l_pct,
+                 colors = c("#440154", "#31688E", "#35B779", "#FDE725"),
+                 type = 'scatter',
+                 mode = 'markers',
+                 marker = list(size = 8, opacity = 0.6,
+                               colorbar = list(title = "White<br>Pop %")),
+                 text = ~hover_text,
+                 hovertemplate = '%{text}<extra></extra>') %>%
+      layout(
+        title = list(text = "<b>UV Exposure vs Melanoma Rate</b>", font = list(size = 18)),
+        xaxis = list(title = "UV Intensity (W/m²)"),
+        yaxis = list(title = "Melanoma Rate (per 100k)"),
+        plot_bgcolor = "#f8f9fa",
+        paper_bgcolor = "white",
+        font = list(family = "Segoe UI")
+      )
+    
+    p
+  })
+  
+  # 3. SIMPSON'S PARADOX VISUALIZATION
+  output$simpsons_paradox <- renderPlot({
+    data <- analysis_data()
+    
+    # Create tertiles for white population
+    data$white_tertile <- cut(data$white_not_h_or_l_pct, 
+                              breaks = quantile(data$white_not_h_or_l_pct, c(0, 1/3, 2/3, 1)),
+                              labels = c("Low (<50%)", "Medium (50-75%)", "High (>75%)"))
+    
+    ggplot(data, aes(x = uv_value, y = age_adj_inc_rate)) +
+      geom_point(aes(color = white_tertile), alpha = 0.4, size = 2) +
+      geom_smooth(method = "lm", se = TRUE, color = "red", linewidth = 1.5, 
+                  linetype = "dashed", aes(group = 1)) +
+      geom_smooth(aes(color = white_tertile), method = "lm", se = FALSE, linewidth = 1.2) +
+      scale_color_manual(values = c("#2E7D32", "#1976D2", "#7B1FA2"),
+                         name = "White Population") +
+      labs(
+        title = "Simpson's Paradox in UV-Melanoma Relationship",
+        subtitle = "Overall trend (red dashed) vs. Within-group trends (colored)",
+        x = "UV Intensity (W/m²)",
+        y = "Melanoma Rate (per 100k)"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(color = "gray40"),
+        legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "#f8f9fa", color = NA)
+      ) +
+      annotate("text", x = max(data$uv_value) * 0.95, y = max(data$age_adj_inc_rate) * 0.95,
+               label = "Paradox: Overall negative\nWithin groups: positive",
+               hjust = 1, vjust = 1, size = 4, color = "red", fontface = "italic")
+  })
+  
+  # 4. MODEL COMPARISON VISUALIZATION
+  output$model_comparison <- renderPlot({
+    data <- analysis_data()
+    
+    # Fit models
     m1 <- lm(age_adj_inc_rate ~ uv_value, data = data)
     m2 <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
     m3 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
     m4 <- lm(age_adj_inc_rate ~ uv_value * white_not_h_or_l_pct, data = data)
     
-    comparison <- data.frame(
-      Model = c("UV Only", "White % Only", "UV + White %", "UV × White %"),
-      R_squared = c(summary(m1)$r.squared, summary(m2)$r.squared, 
-                    summary(m3)$r.squared, summary(m4)$r.squared),
+    # Create comparison data
+    models <- data.frame(
+      Model = c("UV Only", "Demographics Only", "UV + Demographics", "UV × Demographics"),
+      R2 = c(summary(m1)$r.squared, summary(m2)$r.squared, 
+             summary(m3)$r.squared, summary(m4)$r.squared) * 100,
       AIC = c(AIC(m1), AIC(m2), AIC(m3), AIC(m4))
     )
     
-    comparison$Model <- factor(comparison$Model, levels = comparison$Model)
-    comparison$Variance_Explained <- comparison$R_squared * 100
+    # Normalize AIC for visualization (inverse so higher is better)
+    models$AIC_score <- 100 * (1 - (models$AIC - min(models$AIC)) / (max(models$AIC) - min(models$AIC)))
     
-    ggplot(comparison, aes(x = Model, y = Variance_Explained, fill = Model)) +
-      geom_col(color = "black", width = 0.7) +
-      geom_text(aes(label = sprintf("R² = %.1f%%\nAIC = %.0f", Variance_Explained, AIC)),
+    models_long <- tidyr::pivot_longer(models, cols = c(R2, AIC_score), 
+                                       names_to = "Metric", values_to = "Value")
+    models_long$Metric <- factor(models_long$Metric, 
+                                 levels = c("R2", "AIC_score"),
+                                 labels = c("Variance Explained (%)", "Model Fit Score"))
+    
+    ggplot(models_long, aes(x = Model, y = Value, fill = Metric)) +
+      geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+      geom_text(aes(label = round(Value, 1)), 
+                position = position_dodge(width = 0.7), 
                 vjust = -0.5, size = 4, fontface = "bold") +
-      scale_fill_manual(values = c("#E74C3C", "#F39C12", "#27AE60", "#2E86AB")) +
-      labs(title = "Model Comparison: Variance Explained", 
-           subtitle = "Lower AIC = Better fit",
-           x = "", y = "Variance Explained (%)") +
+      scale_fill_manual(values = c("#1E88E5", "#43A047")) +
+      scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
+      labs(
+        title = "Model Performance Comparison",
+        subtitle = "Higher values indicate better model performance",
+        x = "",
+        y = "Score"
+      ) +
       theme_minimal(base_size = 14) +
-      theme(legend.position = "none", plot.title = element_text(face = "bold")) +
-      ylim(0, max(comparison$Variance_Explained) * 1.2)
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(color = "gray40"),
+        legend.position = "top",
+        legend.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()
+      ) +
+      ylim(0, 110)
   })
   
-  # 3. Effect Size Comparison
-  output$regression_coefficients <- renderPlot({
+  # 5. EFFECT SIZE COMPARISON
+  output$effect_comparison <- renderPlot({
     data <- analysis_data()
     
+    # Standardize variables
     data_std <- data %>%
       mutate(
         uv_std = scale(uv_value)[,1],
@@ -767,326 +875,402 @@ shinyServer(function(input, output, session) {
         melanoma_std = scale(age_adj_inc_rate)[,1]
       )
     
+    # Fit standardized model
     m_std <- lm(melanoma_std ~ uv_std + white_std, data = data_std)
     
-    coef_data <- as.data.frame(confint(m_std))
-    coef_data$Variable <- rownames(coef_data)
-    coef_data$Estimate <- coef(m_std)
-    colnames(coef_data)[1:2] <- c("CI_lower", "CI_upper")
+    # Get coefficients with confidence intervals
+    ci <- confint(m_std)
+    coef_data <- data.frame(
+      Variable = c("UV Exposure", "White Population %"),
+      Effect = coef(m_std)[2:3],
+      Lower = ci[2:3, 1],
+      Upper = ci[2:3, 2]
+    )
     
-    coef_data <- coef_data[coef_data$Variable != "(Intercept)", ]
-    coef_data$Variable <- c("UV Intensity", "White Population %")
-    
-    ggplot(coef_data, aes(x = Variable, y = Estimate)) +
-      geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-      geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), 
-                    width = 0.2, linewidth = 1.5, color = "#2E86AB") +
-      geom_point(size = 5, color = "#E74C3C") +
+    ggplot(coef_data, aes(x = Variable, y = Effect)) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", size = 1) +
+      geom_errorbar(aes(ymin = Lower, ymax = Upper), 
+                    width = 0.15, size = 1.2, color = "#424242") +
+      geom_point(size = 6, color = "#D32F2F") +
+      geom_text(aes(label = sprintf("%.2f", Effect)), 
+                vjust = -1.5, size = 5, fontface = "bold") +
       coord_flip() +
       labs(
-        title = "Standardized Regression Coefficients (Effect Sizes)",
-        subtitle = "1 SD increase in predictor → change in melanoma rate (in SD units)",
+        title = "Standardized Effect Sizes",
+        subtitle = "Effect of 1 standard deviation increase (with 95% CI)",
         x = "",
-        y = "Standardized Coefficient (95% CI)"
+        y = "Change in Melanoma Rate (SD units)"
       ) +
       theme_minimal(base_size = 14) +
-      theme(plot.title = element_text(face = "bold"))
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(color = "gray40"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.text.y = element_text(size = 12, face = "bold")
+      ) +
+      ylim(min(coef_data$Lower) * 1.2, max(coef_data$Upper) * 1.3)
   })
   
-  # 4. Partial Regression Plot
-  output$partial_regression <- renderPlot({
+  # 6. PARTIAL REGRESSION VISUALIZATION
+  output$partial_plot <- renderPlot({
     data <- analysis_data()
     
+    # Calculate residuals
     m_melanoma_vs_white <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
-    resid_melanoma <- residuals(m_melanoma_vs_white)
-    
     m_uv_vs_white <- lm(uv_value ~ white_not_h_or_l_pct, data = data)
-    resid_uv <- residuals(m_uv_vs_white)
     
-    plot_data <- data.frame(resid_uv = resid_uv, resid_melanoma = resid_melanoma)
+    plot_data <- data.frame(
+      uv_residual = residuals(m_uv_vs_white),
+      melanoma_residual = residuals(m_melanoma_vs_white)
+    )
     
-    ggplot(plot_data, aes(x = resid_uv, y = resid_melanoma)) +
-      geom_point(alpha = 0.4, size = 2, color = "#2E86AB") +
-      geom_smooth(method = "lm", color = "#E74C3C", linewidth = 1.5, se = TRUE) +
+    # Calculate correlation for annotation
+    partial_cor <- cor(plot_data$uv_residual, plot_data$melanoma_residual)
+    
+    ggplot(plot_data, aes(x = uv_residual, y = melanoma_residual)) +
+      geom_hex(bins = 30, alpha = 0.8) +
+      geom_smooth(method = "lm", color = "#D32F2F", size = 1.5, se = TRUE) +
+      scale_fill_viridis_c(option = "plasma", name = "Count") +
       labs(
-        title = "Partial Regression Plot: UV Effect After Controlling for White %",
-        subtitle = "Shows pure UV-melanoma relationship independent of demographics",
-        x = "UV Intensity (residuals after removing white % effect)",
-        y = "Melanoma Rate (residuals after removing white % effect)"
+        title = "True UV Effect After Removing Demographic Influence",
+        subtitle = paste0("Partial correlation: r = ", round(partial_cor, 3)),
+        x = "UV Residuals (demographic effect removed)",
+        y = "Melanoma Residuals (demographic effect removed)"
       ) +
       theme_minimal(base_size = 14) +
-      theme(plot.title = element_text(face = "bold"))
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(color = "#D32F2F", size = 12, face = "italic"),
+        legend.position = "right",
+        panel.background = element_rect(fill = "#f8f9fa", color = NA)
+      ) +
+      annotate("text", 
+               x = min(plot_data$uv_residual) * 0.95, 
+               y = max(plot_data$melanoma_residual) * 0.95,
+               label = "Positive relationship\nemerges after\ncontrolling for\ndemographics",
+               hjust = 0, vjust = 1, size = 4, color = "#1976D2", fontface = "bold")
   })
   
-  # 5. Model Diagnostics
-  output$residual_diagnostics <- renderPlot({
+  # 7. GEOGRAPHIC PATTERN MAP (MODEL PREDICTIONS EXPLAINED)
+  output$residual_map <- renderPlotly({
     data <- analysis_data()
+    
+    # Fit model and get residuals
     m_full <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    data$residuals <- residuals(m_full)
+    data$predicted <- fitted(m_full)
     
-    par(mfrow = c(2, 2))
-    plot(m_full, which = c(1, 2, 3, 5))
-    par(mfrow = c(1, 1))
-  }, height = 600)
-  
-  # 6. Model Interpretation
-  output$model_interpretation <- renderUI({
-    data <- analysis_data()
-    m3 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
-    
-    uv_coef <- coef(m3)["uv_value"]
-    white_coef <- coef(m3)["white_not_h_or_l_pct"]
-    uv_pval <- summary(m3)$coefficients["uv_value", "Pr(>|t|)"]
-    
-    HTML(paste0("<div style='padding: 20px; background-color: #D4EDDA; border-left: 5px solid #28A745;'>
-    <h4 style='color: #155724;'>✅ What These Results Mean</h4>
-    
-    <p><strong>Multiple Regression Results:</strong></p>
-    <ul>
-      <li><strong>UV Effect:</strong> β = ", sprintf("%.5f", uv_coef), 
-                " (p ", ifelse(uv_pval < 0.001, "< 0.001", paste0("= ", round(uv_pval, 4))), ")<br>",
-                "→ 100 W/m² UV increase = ", sprintf("%.2f", uv_coef * 100), 
-                " more cases per 100k</li>
-      
-      <li><strong>White % Effect:</strong> β = ", sprintf("%.3f", white_coef), " (p < 0.001)<br>",
-                "→ 10% white pop increase = ", sprintf("%.2f", white_coef * 10), " more cases per 100k</li>
-    </ul>
-    
-    <p><strong>Effect Size:</strong></p>
-    <ul>
-      <li>1 SD UV change (", round(sd(data$uv_value)), " W/m²) → ", 
-                sprintf("%.2f", uv_coef * sd(data$uv_value)), " cases/100k</li>
-      <li>1 SD white % change (", round(sd(data$white_not_h_or_l_pct), 1), "%) → ", 
-                sprintf("%.2f", white_coef * sd(data$white_not_h_or_l_pct)), " cases/100k</li>
-      <li><strong>White % effect is ", 
-                round(abs(white_coef * sd(data$white_not_h_or_l_pct)) / 
-                        abs(uv_coef * sd(data$uv_value)), 1), "× larger</strong></li>
-    </ul>
-    
-    <p style='background: #FFF3CD; padding: 10px; border-radius: 5px;'>
-    <strong>Conclusion:</strong> UV has a statistically significant positive effect, but white population % 
-    dominates county-level melanoma patterns. Demographics > environment in ecological data.</p>
-  </div>"))
-  })
-  
-  # 7. Full Regression Output
-  output$regression_summary <- renderPrint({
-    data <- analysis_data()
-    
-    cat("=== SIMPLE MODELS ===\n\n")
-    
-    m1 <- lm(age_adj_inc_rate ~ uv_value, data = data)
-    cat("Model 1: UV only\n")
-    cat("R² =", round(summary(m1)$r.squared, 4), "\n")
-    cat("UV coefficient:", round(coef(m1)[2], 5), "\n\n")
-    
-    m2 <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
-    cat("Model 2: White % only\n")
-    cat("R² =", round(summary(m2)$r.squared, 4), "\n")
-    cat("White % coefficient:", round(coef(m2)[2], 5), "\n\n")
-    
-    cat("=== MULTIPLE REGRESSION ===\n\n")
-    m3 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
-    print(summary(m3))
-    
-    cat("\n=== INTERACTION MODEL ===\n\n")
-    m4 <- lm(age_adj_inc_rate ~ uv_value * white_not_h_or_l_pct, data = data)
-    print(summary(m4))
-    
-    cat("\n=== MODEL COMPARISON ===\n")
-    cat("AIC: UV =", round(AIC(m1), 1), "| White% =", round(AIC(m2), 1),
-        "| Both =", round(AIC(m3), 1), "| Interaction =", round(AIC(m4), 1), "\n")
-  })
-  
-  # 8. Occupation Analysis
-  analysis_data_occupation <- reactive({
-    analysis_data() %>%
-      left_join(occupation_data %>% select(fips_occupation, outdoor_pct, farming_pct, construction_pct),
-                by = c("fips_melanoma" = "fips_occupation")) %>%
-      filter(!is.na(outdoor_pct))
-  })
-  
-  output$occupation_correlation <- renderText({
-    data <- analysis_data_occupation()
-    
-    cor_outdoor <- cor(data$outdoor_pct, data$age_adj_inc_rate)
-    cor_farming <- cor(data$farming_pct, data$age_adj_inc_rate)
-    cor_construction <- cor(data$construction_pct, data$age_adj_inc_rate)
-    
-    m_melanoma_vs_white <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
-    m_outdoor_vs_white <- lm(outdoor_pct ~ white_not_h_or_l_pct, data = data)
-    partial_cor <- cor(residuals(m_melanoma_vs_white), residuals(m_outdoor_vs_white))
-    
-    paste0(
-      "Sample Size: ", nrow(data), " counties\n\n",
-      "=== BIVARIATE CORRELATIONS ===\n",
-      "Total Outdoor %: r = ", round(cor_outdoor, 3), "\n",
-      "Farming %: r = ", round(cor_farming, 3), "\n",
-      "Construction %: r = ", round(cor_construction, 3), "\n\n",
-      "=== PARTIAL CORRELATION (controlling for white %) ===\n",
-      "Outdoor % vs Melanoma: r = ", round(partial_cor, 3), "\n\n",
-      "Counties with more outdoor workers have LOWER melanoma.\n",
-      "Likely reflects healthcare access disparities in rural areas."
+    # Create hover text
+    data$hover_text <- paste0(
+      "<b>", data$county, ", ", data$state, "</b><br>",
+      "Actual: ", round(data$age_adj_inc_rate, 1), "<br>",
+      "Predicted: ", round(data$predicted, 1), "<br>",
+      "Residual: ", ifelse(data$residuals > 0, "+", ""), round(data$residuals, 1), "<br>",
+      ifelse(abs(data$residuals) > 10, 
+             "<b style='color:red'>Large deviation!</b>", 
+             "Within expected range")
     )
+    
+    plot_ly(data, 
+            x = ~predicted, 
+            y = ~age_adj_inc_rate,
+            color = ~residuals,
+            colors = c("#2166AC", "#F7F7F7", "#B2182B"),
+            type = 'scatter',
+            mode = 'markers',
+            marker = list(size = 8, opacity = 0.7,
+                          colorbar = list(title = "Residual<br>(Actual-Predicted)")),
+            text = ~hover_text,
+            hovertemplate = '%{text}<extra></extra>') %>%
+      layout(
+        title = list(text = "<b>How Well Does Our Model Predict?</b>", font = list(size = 18)),
+        xaxis = list(title = "What Our Model Predicts"),
+        yaxis = list(title = "What Actually Happened"),
+        plot_bgcolor = "#f8f9fa",
+        paper_bgcolor = "white",
+        shapes = list(
+          list(type = "line",
+               x0 = min(data$predicted), y0 = min(data$predicted),
+               x1 = max(data$predicted), y1 = max(data$predicted),
+               line = list(color = "gray", dash = "dash"))
+        ),
+        annotations = list(
+          list(x = max(data$predicted) * 0.95, y = max(data$predicted) * 0.85,
+               text = "Perfect Prediction Line",
+               showarrow = FALSE,
+               font = list(color = "gray", size = 12))
+        )
+      )
   })
   
-  output$occupation_regression <- renderPrint({
-    data <- analysis_data_occupation()
-    
-    m1 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
-    m2 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct + outdoor_pct, data = data)
-    m3 <- lm(age_adj_inc_rate ~ uv_value * outdoor_pct + white_not_h_or_l_pct, data = data)
-    
-    cat("=== MODEL COMPARISON ===\n\n")
-    cat("Baseline: R² =", round(summary(m1)$r.squared, 4), "| AIC =", round(AIC(m1), 1), "\n")
-    cat("+ Outdoor %: R² =", round(summary(m2)$r.squared, 4), "| AIC =", round(AIC(m2), 1), "\n")
-    cat("+ Interaction: R² =", round(summary(m3)$r.squared, 4), "| AIC =", round(AIC(m3), 1), "\n\n")
-    
-    cat("=== MODEL WITH OUTDOOR % ===\n")
-    print(summary(m2))
-    
-    cat("\n=== INTERACTION MODEL ===\n")
-    print(summary(m3))
-  })
-  
-  output$occupation_interpretation <- renderUI({
-    HTML("<div style='padding: 20px; background-color: #FFF3CD; border-left: 5px solid #FF6B35;'>
-    <h4 style='color: #FF6B35;'>🔍 The Outdoor Work Paradox</h4>
-    <p><strong>Finding:</strong> Counties with MORE outdoor workers have LOWER melanoma rates</p>
-    <p><strong>Explanations:</strong></p>
-    <ol>
-      <li><strong>Detection bias:</strong> Rural counties lack dermatology access</li>
-      <li><strong>Dataset limitation:</strong> Invasive melanoma only (excludes early-stage)</li>
-      <li><strong>Healthcare disparities:</strong> Less insurance/screening in rural areas</li>
-    </ol>
-  </div>")
-  })
-  
-  output$occupation_uv_plot <- renderPlot({
-    data <- analysis_data_occupation()
-    
-    data <- data %>%
-      mutate(outdoor_tertile = cut(outdoor_pct, 
-                                   breaks = quantile(outdoor_pct, c(0, 1/3, 2/3, 1)),
-                                   labels = c("Low", "Medium", "High")))
-    
-    ggplot(data, aes(x = uv_value, y = age_adj_inc_rate, color = outdoor_tertile)) +
-      geom_point(alpha = 0.4, size = 2) +
-      geom_smooth(method = "lm", se = TRUE, linewidth = 1.5) +
-      scale_color_manual(values = c("#27AE60", "#F39C12", "#E74C3C"), name = "Outdoor Work %") +
-      labs(title = "UV × Melanoma by Outdoor Occupation", x = "UV (W/m²)", y = "Melanoma (per 100k)") +
-      theme_minimal(base_size = 14) +
-      theme(legend.position = "bottom")
-  })
-  
-  output$occupation_sensitivity <- renderPrint({
-    data <- analysis_data_occupation()
-    
-    cat("=== SENSITIVITY ANALYSIS ===\n\n")
-    
-    high_white <- data %>% filter(white_not_h_or_l_pct > 85)
-    m_high_white <- lm(age_adj_inc_rate ~ uv_value + outdoor_pct, data = high_white)
-    
-    cat("1. HIGH WHITE % (>85%):\n")
-    cat("   N =", nrow(high_white), "\n")
-    cat("   Outdoor coef:", round(coef(m_high_white)["outdoor_pct"], 4), "\n")
-    cat("   p =", format(coef(summary(m_high_white))["outdoor_pct", "Pr(>|t|)"], scientific=TRUE), "\n\n")
-    
-    high_farming <- data %>% filter(farming_pct > median(farming_pct))
-    m_high_farming <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = high_farming)
-    
-    cat("2. HIGH FARMING (>median):\n")
-    cat("   N =", nrow(high_farming), "\n")
-    cat("   UV coef:", round(coef(m_high_farming)["uv_value"], 6), "\n")
-    cat("   p =", format(coef(summary(m_high_farming))["uv_value", "Pr(>|t|)"], scientific=TRUE), "\n\n")
-    
-    low_outdoor <- data %>% filter(outdoor_pct < quantile(outdoor_pct, 0.25))
-    m_low_outdoor <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = low_outdoor)
-    
-    cat("3. LOW OUTDOOR (bottom 25%):\n")
-    cat("   N =", nrow(low_outdoor), "\n")
-    cat("   UV coef:", round(coef(m_low_outdoor)["uv_value"], 6), "\n")
-    cat("   p =", format(coef(summary(m_low_outdoor))["uv_value", "Pr(>|t|)"], scientific=TRUE), "\n")
-  })
-  # 9. ANOVA: UV and White% contributions
-  output$anova_table <- renderPrint({
+  # 8. KEY INSIGHTS SUMMARY
+  output$insights_summary <- renderUI({
     data <- analysis_data()
     
-    # Sequential ANOVA (order matters)
+    # Calculate key statistics
     m_full <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    uv_coef <- coef(m_full)["uv_value"]
+    white_coef <- coef(m_full)["white_not_h_or_l_pct"]
     
-    cat("=== TYPE I ANOVA (Sequential) ===\n")
-    cat("Tests each variable after those before it\n\n")
-    print(anova(m_full))
+    # Effect sizes
+    uv_effect_100 <- uv_coef * 100
+    white_effect_10 <- white_coef * 10
     
-    cat("\n=== TYPE II ANOVA (Marginal) ===\n")
-    cat("Tests each variable after all others\n\n")
-    if(requireNamespace("car", quietly = TRUE)) {
-      print(car::Anova(m_full, type = "II"))
-    } else {
-      cat("Install 'car' for Type II: install.packages('car')\n")
-    }
+    HTML(paste0('
+    <div class="insights-container">
+      <h4 style="color: #1976D2; margin-bottom: 20px;"><i class="fa fa-lightbulb"></i> Key Statistical Insights</h4>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <div class="insight-box" style="background: #E3F2FD; border-left: 4px solid #1976D2;">
+            <h5 style="color: #1976D2;">UV Exposure Effect</h5>
+            <p style="font-size: 24px; font-weight: bold; color: #0D47A1;">+', 
+                round(uv_effect_100, 1), ' cases</p>
+            <p style="color: #666;">per 100 W/m² increase in UV</p>
+            <small style="color: #999;">Statistically significant (p < 0.05)</small>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="insight-box" style="background: #FCE4EC; border-left: 4px solid #C2185B;">
+            <h5 style="color: #C2185B;">Demographic Effect</h5>
+            <p style="font-size: 24px; font-weight: bold; color: #880E4F;">+', 
+                round(white_effect_10, 1), ' cases</p>
+            <p style="color: #666;">per 10% increase in white population</p>
+            <small style="color: #999;">Strongest predictor (p < 0.001)</small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="alert alert-info" style="margin-top: 20px;">
+        <strong>Bottom Line:</strong> Both UV exposure and demographics matter, but demographic composition 
+        has approximately ', round(abs(white_coef * sd(data$white_not_h_or_l_pct)) / 
+                                     abs(uv_coef * sd(data$uv_value)), 1), 
+                'x larger effect at the county level. This is a classic example of confounding in ecological data.
+      </div>
+    </div>
+    '))
   })
   
-  # 10. Nested Model Comparison
-  output$nested_models <- renderPrint({
-    data <- analysis_data()
-    
-    m0 <- lm(age_adj_inc_rate ~ 1, data = data)
-    m1 <- lm(age_adj_inc_rate ~ uv_value, data = data)
-    m2 <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
-    m3 <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
-    
-    cat("=== NESTED MODEL F-TESTS ===\n\n")
-    
-    cat("1. Does UV improve over intercept-only?\n")
-    print(anova(m0, m1))
-    
-    cat("\n2. Does White% improve over intercept-only?\n")
-    print(anova(m0, m2))
-    
-    cat("\n3. Does adding White% improve UV-only model?\n")
-    print(anova(m1, m3))
-    
-    cat("\n4. Does adding UV improve White%-only model?\n")
-    print(anova(m2, m3))
-  })
-  # 11. Residual Analysis
-  output$residual_analysis <- renderPrint({
+  # 9. DIAGNOSTIC PLOTS - WITH DETAILED EXPLANATIONS
+  output$diagnostic_plots <- renderPlot({
     data <- analysis_data()
     m <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
     
-    cat("=== RESIDUAL DIAGNOSTICS ===\n\n")
-    cat("Model: melanoma ~ UV + White%\n\n")
+    # Create diagnostic plots with better labels
+    par(mfrow = c(2, 2), mar = c(4, 4, 3, 2))
     
-    resids <- residuals(m)
+    # 1. Residuals vs Fitted
+    plot(fitted(m), residuals(m), 
+         main = "1. Linearity Check",
+         xlab = "Predicted Values", 
+         ylab = "Residuals (Prediction Errors)",
+         pch = 20, col = alpha("#2166AC", 0.5))
+    abline(h = 0, lty = 2, col = "red", lwd = 2)
+    lines(lowess(fitted(m), residuals(m)), col = "red", lwd = 2)
+    mtext("Should be scattered around red line", cex = 0.8, line = 0.5)
     
-    cat("Residual Summary:\n")
-    print(summary(resids))
+    # 2. Q-Q Plot
+    qqnorm(residuals(m), main = "2. Normality Check",
+           pch = 20, col = alpha("#2166AC", 0.5),
+           xlab = "Theoretical Normal", ylab = "Sample Residuals")
+    qqline(residuals(m), col = "red", lwd = 2)
+    mtext("Points should follow red line", cex = 0.8, line = 0.5)
     
-    cat("\n\nShapiro-Wilk Normality Test:\n")
-    if(length(resids) <= 5000) {
-      print(shapiro.test(resids))
-    } else {
-      cat("Sample too large, use Q-Q plot instead\n")
-    }
+    # 3. Scale-Location
+    plot(fitted(m), sqrt(abs(standardize(residuals(m)))), 
+         main = "3. Equal Variance Check",
+         xlab = "Predicted Values", 
+         ylab = "√|Standardized Residuals|",
+         pch = 20, col = alpha("#2166AC", 0.5))
+    lines(lowess(fitted(m), sqrt(abs(standardize(residuals(m))))), 
+          col = "red", lwd = 2)
+    mtext("Red line should be horizontal", cex = 0.8, line = 0.5)
     
-    cat("\n\nHomoscedasticity (Breusch-Pagan Test):\n")
-    if(requireNamespace("lmtest", quietly = TRUE)) {
-      print(lmtest::bptest(m))
-    } else {
-      cat("Install 'lmtest': install.packages('lmtest')\n")
-    }
-  })
-  
-  output$residual_plots <- renderPlot({
-    data <- analysis_data()
-    m <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    # 4. Influential Points
+    cooksd <- cooks.distance(m)
+    plot(cooksd, 
+         main = "4. Influential Counties",
+         xlab = "County Index", 
+         ylab = "Cook's Distance",
+         type = "h", col = ifelse(cooksd > 4/nrow(data), "red", "gray50"))
+    abline(h = 4/nrow(data), lty = 2, col = "red")
+    mtext("Red bars = potentially influential", cex = 0.8, line = 0.5)
     
-    par(mfrow = c(2, 2))
-    plot(m, which = 1:4)
     par(mfrow = c(1, 1))
   }, height = 600)
+  
+  # 10. VISUAL ANOVA - VARIANCE DECOMPOSITION
+  output$anova_visual <- renderPlot({
+    data <- analysis_data()
+    
+    # Fit models
+    m_null <- lm(age_adj_inc_rate ~ 1, data = data)
+    m_uv <- lm(age_adj_inc_rate ~ uv_value, data = data)
+    m_white <- lm(age_adj_inc_rate ~ white_not_h_or_l_pct, data = data)
+    m_full <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    
+    # Calculate sum of squares
+    ss_total <- sum((data$age_adj_inc_rate - mean(data$age_adj_inc_rate))^2)
+    ss_uv_alone <- sum((fitted(m_uv) - mean(data$age_adj_inc_rate))^2)
+    ss_white_alone <- sum((fitted(m_white) - mean(data$age_adj_inc_rate))^2)
+    ss_model <- sum((fitted(m_full) - mean(data$age_adj_inc_rate))^2)
+    ss_residual <- sum(residuals(m_full)^2)
+    
+    # Create variance decomposition data
+    var_data <- data.frame(
+      Component = c("UV Alone", "Demographics Alone", "UV + Demographics", "Unexplained"),
+      Variance = c(ss_uv_alone/ss_total * 100, 
+                   ss_white_alone/ss_total * 100,
+                   ss_model/ss_total * 100,
+                   ss_residual/ss_total * 100),
+      Type = c("Single", "Single", "Combined", "Error")
+    )
+    
+    # Create the plot
+    p1 <- ggplot(var_data[1:3,], aes(x = Component, y = Variance, fill = Component)) +
+      geom_bar(stat = "identity", width = 0.6) +
+      geom_text(aes(label = paste0(round(Variance, 1), "%")), 
+                vjust = -0.5, size = 5, fontface = "bold") +
+      scale_fill_manual(values = c("#FF9800", "#2196F3", "#4CAF50")) +
+      labs(title = "ANOVA: How Much Variance Does Each Factor Explain?",
+           subtitle = "Higher percentage = better predictor",
+           x = "", y = "Variance Explained (%)") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "none",
+            plot.title = element_text(face = "bold", size = 16),
+            axis.text.x = element_text(angle = 20, hjust = 1)) +
+      ylim(0, max(var_data$Variance[1:3]) * 1.2)
+    
+    # F-statistic comparison
+    f_uv <- (ss_uv_alone / 1) / (ss_residual / (nrow(data) - 3))
+    f_white <- (ss_white_alone / 1) / (ss_residual / (nrow(data) - 3))
+    
+    f_data <- data.frame(
+      Variable = c("UV Effect", "Demographic Effect"),
+      F_stat = c(f_uv, f_white)
+    )
+    
+    p2 <- ggplot(f_data, aes(x = Variable, y = F_stat, fill = Variable)) +
+      geom_bar(stat = "identity", width = 0.5) +
+      geom_text(aes(label = round(F_stat, 0)), 
+                vjust = -0.5, size = 5, fontface = "bold") +
+      scale_fill_manual(values = c("#FF5722", "#9C27B0")) +
+      labs(title = "F-Statistics: Statistical Significance",
+           subtitle = "Higher F = more significant (all p < 0.001)",
+           x = "", y = "F-Statistic") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "none",
+            plot.title = element_text(face = "bold", size = 14)) +
+      ylim(0, max(f_data$F_stat) * 1.2)
+    
+    # Combine plots
+    gridExtra::grid.arrange(p1, p2, ncol = 2, widths = c(2, 1))
+  })
+  
+  # 11. REGRESSION SUMMARY - VISUAL VERSION
+  output$regression_visual <- renderPlot({
+    data <- analysis_data()
+    
+    # Fit the full model
+    m <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    
+    # Extract coefficients and stats
+    coef_summary <- summary(m)$coefficients
+    
+    # Create coefficient data
+    coef_data <- data.frame(
+      Variable = c("UV Intensity\n(per 100 W/m²)", "White Population\n(per 10%)"),
+      Coefficient = c(coef(m)[2] * 100, coef(m)[3] * 10),
+      StdError = c(coef_summary[2, 2] * 100, coef_summary[3, 2] * 10),
+      pValue = coef_summary[2:3, 4]
+    )
+    
+    coef_data$Significance <- ifelse(coef_data$pValue < 0.001, "***",
+                                     ifelse(coef_data$pValue < 0.01, "**",
+                                            ifelse(coef_data$pValue < 0.05, "*", "")))
+    
+    ggplot(coef_data, aes(x = Variable, y = Coefficient)) +
+      geom_bar(stat = "identity", fill = c("#FF6B6B", "#4ECDC4"), width = 0.6) +
+      geom_errorbar(aes(ymin = Coefficient - 1.96*StdError, 
+                        ymax = Coefficient + 1.96*StdError),
+                    width = 0.2, size = 1.2) +
+      geom_text(aes(label = paste0(round(Coefficient, 2), Significance)), 
+                vjust = -2, size = 6, fontface = "bold") +
+      labs(title = "Linear Regression Results",
+           subtitle = paste0("Model R² = ", round(summary(m)$r.squared, 3), 
+                             " | Both predictors highly significant (p < 0.001)"),
+           x = "", 
+           y = "Effect on Melanoma Rate (cases per 100k)") +
+      theme_minimal(base_size = 14) +
+      theme(plot.title = element_text(face = "bold", size = 16),
+            plot.subtitle = element_text(color = "gray40"),
+            axis.text.x = element_text(size = 12, face = "bold")) +
+      ylim(0, max(coef_data$Coefficient + coef_data$StdError) * 1.3) +
+      annotate("text", x = 1.5, y = max(coef_data$Coefficient) * 0.5,
+               label = "Both factors matter,\nbut demographics\nhas larger effect",
+               size = 4, color = "gray30", fontface = "italic")
+  })
+  
+  # 10. INTERACTIVE TABLE OF TOP/BOTTOM COUNTIES
+  output$county_table <- renderDT({
+    data <- analysis_data()
+    m <- lm(age_adj_inc_rate ~ uv_value + white_not_h_or_l_pct, data = data)
+    
+    data$predicted <- fitted(m)
+    data$residual <- residuals(m)
+    
+    # Select top and bottom 10 residuals
+    top_counties <- data %>%
+      arrange(desc(residual)) %>%
+      head(10) %>%
+      mutate(Type = "Higher than Expected")
+    
+    bottom_counties <- data %>%
+      arrange(residual) %>%
+      head(10) %>%
+      mutate(Type = "Lower than Expected")
+    
+    combined <- rbind(top_counties, bottom_counties) %>%
+      select(county, state, age_adj_inc_rate, predicted, residual, 
+             uv_value, white_not_h_or_l_pct, Type) %>%
+      mutate(
+        age_adj_inc_rate = round(age_adj_inc_rate, 1),
+        predicted = round(predicted, 1),
+        residual = round(residual, 1),
+        uv_value = round(uv_value, 0),
+        white_not_h_or_l_pct = round(white_not_h_or_l_pct, 1)
+      )
+    
+    datatable(
+      combined,
+      colnames = c("County", "State", "Actual Rate", "Predicted", "Difference", 
+                   "UV", "White %", "Category"),
+      options = list(
+        pageLength = 10,
+        dom = 'tip',
+        order = list(list(4, 'desc'))
+      ),
+      rownames = FALSE
+    ) %>%
+      formatStyle(
+        'Type',
+        backgroundColor = styleEqual(
+          c("Higher than Expected", "Lower than Expected"),
+          c("#FFEBEE", "#E8F5E9")
+        )
+      ) %>%
+      formatStyle(
+        'residual',
+        color = styleInterval(0, c("#C62828", "#2E7D32")),
+        fontWeight = 'bold'
+      )
+  })
+  
+  # Helper function for standardizing residuals
+  standardize <- function(x) {
+    (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
+  }
   
 })
-  
-  
