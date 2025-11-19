@@ -862,7 +862,7 @@ output$regression_summary <- renderPrint({
   print(summary(model3))
 })
 
-# 7. OCCUPATION ANALYSIS
+# 7
 analysis_data_occupation <- reactive({
   analysis_data() %>%
     left_join(occupation_data %>% dplyr::select(fips_occupation, outdoor_pct, farming_pct, construction_pct),
@@ -888,6 +888,7 @@ output$occupation_correlation <- renderText({
   )
 })
 
+#8
 output$occupation_regression <- renderPrint({
   data <- analysis_data_occupation()
   
@@ -917,6 +918,8 @@ output$occupation_interpretation <- renderUI({
   </div>")
   })
 
+
+#9
 output$occupation_uv_plot <- renderPlot({
   data <- analysis_data_occupation()
   
@@ -942,7 +945,7 @@ output$occupation_uv_plot <- renderPlot({
     theme(plot.title = element_text(face = "bold"), legend.position = "bottom")
 })
 
-# Add after Section 11
+#10
 output$occupation_sensitivity <- renderPrint({
   data <- analysis_data_occupation()
   

@@ -182,22 +182,12 @@ shinyUI(
           h3("6. Full Regression Model Details"),
           verbatimTextOutput("regression_summary")
         ),
+    
         
         hr(),
         
         wellPanel(
-          h3("7. Occupational Exposure Analysis"),
-          p("Does the percentage of outdoor workers explain additional melanoma variance?"),
-          verbatimTextOutput("occupation_correlation"),
-          hr(),
-          h4("Regression Model Comparison"),
-          verbatimTextOutput("occupation_regression")
-        ),
-        
-        hr(),
-        
-        wellPanel(
-          h3("8. UV × Outdoor Occupation Interaction"),
+          h3("7. UV × Outdoor Occupation Interaction"),
           p("Do counties with more outdoor workers show stronger UV-melanoma relationships?"),
           plotOutput("occupation_uv_plot", height = "550px")
         ),
@@ -205,7 +195,7 @@ shinyUI(
         
         hr(),
         wellPanel(
-          h3("9. Occupational Exposure Analysis"),
+          h3("8. Occupational Exposure Analysis"),
           uiOutput("occupation_interpretation"),
           hr(),
           h4("Correlations with Melanoma Rate"),
@@ -218,7 +208,7 @@ shinyUI(
         hr(),
         
         wellPanel(
-          h3("12. Sensitivity Analysis: High White Population Counties Only"),
+          h3("9. Sensitivity Analysis: High White Population Counties Only"),
           p("Does the outdoor work paradox persist when demographics are controlled?"),
           verbatimTextOutput("occupation_sensitivity")
         )
