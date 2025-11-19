@@ -81,16 +81,16 @@ shinyUI(
         
         #check boxes
         radioButtons(
-          inputId = "melanoma_view",  # Changed from "viz_options"
+          inputId = "melanoma_view",
           label   = "Show data layers:",
           choices = c(
-            "Melanoma by County" = "count",  # Keep your title, add value
-            "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
+            "Melanoma by County" = "count",
+            "Melanoma Rate (Age-Adjusted per 100k)" = "rate",
             "UV Measurement (wmh2)" = "uv",
             "Physician Availability per 100k" = "md_availability",
-            "Bivariate: UV × Melanoma Rate" = "bivariate" ,
-            "Risk-Adjusted: UV × Melanoma (White Pop Weighted)" = "bivariate_weighted"
-            
+            "Bivariate: UV × Melanoma Rate" = "bivariate",
+            "Risk-Adjusted: UV × Melanoma (White Pop Weighted)" = "bivariate_weighted",
+            "Healthcare Access: MD Availability × Melanoma Rate" = "bivariate_md"
           ),
           selected = "count"   
         ),

@@ -150,6 +150,20 @@ cat("UV breaks (W/m²):", round(us_uv_breaks), "\n")
 cat("Melanoma rate breaks (per 100k):", round(us_melanoma_breaks, 1), "\n")
 cat("Melanoma per white breaks (per 100k white):", round(us_melanoma_per_white_breaks, 1), "\n")
 
+# Calculate US-wide breaks for MD availability
+us_wide_data_md <- melanoma_table %>%
+  left_join(
+    md_availability %>% select(fips_md, md_rate_per_100k),
+    by = c("fips_melanoma" = "fips_md")
+  ) %>%
+  filter(!is.na(age_adj_inc_rate) & !is.na(md_rate_per_100k))
+
+us_md_breaks <- quantile(us_wide_data_md$md_rate_per_100k, 
+                         probs = c(0, 1/3, 2/3, 1), 
+                         na.rm = TRUE)
+
+cat("MD availability breaks (per 100k):", round(us_md_breaks, 1), "\n")
+
 
 #___________________________________________________________________
 
