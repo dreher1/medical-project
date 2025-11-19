@@ -139,90 +139,100 @@ shinyUI(
     tabPanel(
       "Statistical Analysis",
       fluidPage(
-        h2("Statistical Analysis: UV vs Melanoma Relationship"),
-        p("Comprehensive analysis examining confounding, interactions, and model diagnostics."),
+        h2("Statistical Analysis: Confounding in UV-Melanoma Relationship"),
+        p("Examining how demographic confounding masks the true UV-melanoma relationship."),
         
         wellPanel(
-          h3("1. Correlation Summary"),
+          h3("1. Correlation Summary & Confounding Detection"),
           verbatimTextOutput("correlation_summary")
         ),
         
         hr(),
         
         wellPanel(
-          h3("2. Geographic Confounding"),  # CHANGED from "Simpson's Paradox"
-          uiOutput("geographic_explanation"),  # CHANGED
-          plotOutput("geographic_confounding_plot", height = "550px")  # CHANGED
+          h3("2. Multiple Regression: Controlling for Demographics"),
+          p("How does the UV coefficient change when we control for white population %?"),
+          plotOutput("multiple_regression_plot", height = "450px")
         ),
         
         hr(),
         
         wellPanel(
-          h3("3. The Confounding Problem"),
-          p("White population percentage is a stronger predictor than UV."),
-          plotOutput("confounding_plot", height = "500px")
-        ),
-        
-        hr(),
-      
-        wellPanel(
-          h3("4. Model Comparison: Variance Decomposition"),
-          p("How much melanoma variance is explained by each variable?"),
-          plotOutput("variance_decomposition", height = "450px")
+          h3("3. Effect Size Comparison"),
+          p("Standardized coefficients show which variables matter most."),
+          plotOutput("regression_coefficients", height = "400px")
         ),
         
         hr(),
         
         wellPanel(
-          h3("5. Model Interpretation & Clinical Significance"),
+          h3("4. Partial Regression: Pure UV Effect"),
+          p("Visualizing UV-melanoma relationship after removing demographic confounding."),
+          plotOutput("partial_regression", height = "500px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("5. Model Diagnostics"),
+          p("Checking regression assumptions: linearity, normality, homoscedasticity, outliers."),
+          plotOutput("residual_diagnostics", height = "600px")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("6. Model Interpretation"),
           uiOutput("model_interpretation")
         ),
         
         hr(),
         
         wellPanel(
-          h3("6. Full Regression Model Details"),
+          h3("7. Full Regression Output"),
           verbatimTextOutput("regression_summary")
         ),
         
         hr(),
-        
-        wellPanel(
-          h3("7. Occupational Exposure Analysis"),
-          p("Does the percentage of outdoor workers explain additional melanoma variance?"),
-          verbatimTextOutput("occupation_correlation"),
-          hr(),
-          h4("Regression Model Comparison"),
-          verbatimTextOutput("occupation_regression")
-        ),
-        
         hr(),
         
         wellPanel(
-          h3("8. UV × Outdoor Occupation Interaction"),
-          p("Do counties with more outdoor workers show stronger UV-melanoma relationships?"),
-          plotOutput("occupation_uv_plot", height = "550px")
-        ),
-        
-        
-        hr(),
-        wellPanel(
-          h3("9. Occupational Exposure Analysis"),
+          h3("8. Occupational Exposure Analysis"),
           uiOutput("occupation_interpretation"),
           hr(),
           h4("Correlations with Melanoma Rate"),
           verbatimTextOutput("occupation_correlation"),
           hr(),
+          h4("UV × Outdoor Work Interaction"),
+          plotOutput("occupation_uv_plot", height = "500px"),
+          hr(),
           h4("Regression Model Comparison"),
-          verbatimTextOutput("occupation_regression")
+          verbatimTextOutput("occupation_regression"),
+          hr(),
+          h4("Sensitivity Analysis"),
+          verbatimTextOutput("occupation_sensitivity")
         ),
         
         hr(),
         
         wellPanel(
-          h3("12. Sensitivity Analysis: High White Population Counties Only"),
-          p("Does the outdoor work paradox persist when demographics are controlled?"),
-          verbatimTextOutput("occupation_sensitivity")
+          h3("9. ANOVA: Variable Contributions"),
+          verbatimTextOutput("anova_table")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("10. Nested Model Comparisons"),
+          verbatimTextOutput("nested_models")
+        ),
+        
+        hr(),
+        
+        wellPanel(
+          h3("11. Residual Diagnostics"),
+          verbatimTextOutput("residual_analysis"),
+          plotOutput("residual_plots", height = "600px")
         )
       )
     )
