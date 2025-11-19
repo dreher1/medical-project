@@ -173,6 +173,63 @@ county_population <- county_population[-idx, , drop = FALSE]
 row.names(county_population) <- NULL
 
 ```
+Add cleanup and import for the md_availability table
+```{r}
+# Read the input CSV file
+library(readr)
+library(dplyr)
+library(stringr)
+df <- read_csv('md_availability.csv')
+
+# Display basic information about the data
+cat("Original data dimensions:", dim(df), "\n")
+cat("\nFirst few rows:\n")
+print(head(df))
+
+# Separate county name and state
+df_cleaned <- df %>%
+  # Remove duplicate rows
+  distinct() %>%
+  # Remove rows where all values are NA
+  filter(!if_all(everything(), is.na)) %>%
+  # Separate county and state
+  mutate(
+    # Extract state abbreviation (last 2 characters after the comma)
+    state_md = str_trim(str_extract(county, "[A-Z]{2}$")),
+    # Extract county name (everything before the comma)
+    county_full = str_trim(str_extract(county, "^[^,]+")),
+    # Remove common suffixes like "County", "Borough", "Parish", "City", "Census Area", etc.
+    county_md = str_trim(str_remove(county_full, 
+                         "(County|Borough|Parish|City|Municipality|Census Area|Planning Region|City and Borough)$"))
+  ) %>%
+  # Remove the temporary county_full column
+  select(-county_full) %>%
+  # Reorder columns to put county_md and state_md after county
+  select(county, county_md, state_md, everything())
+
+# Trim whitespace from all character columns
+char_cols <- names(df_cleaned)[sapply(df_cleaned, is.character)]
+for (col in char_cols) {
+  df_cleaned[[col]] <- trimws(df_cleaned[[col]])
+}
+
+cat("\n", strrep("=", 50), "\n")
+cat("Cleaned data dimensions:", dim(df_cleaned), "\n")
+cat("\nSample of separated county and state:\n")
+print(head(df_cleaned[, c("county", "county_md", "state_md")], 10))
+
+# Check for any rows where separation might have failed
+failed_rows <- df_cleaned %>% 
+  filter(is.na(county_md) | is.na(state_md))
+
+if(nrow(failed_rows) > 0) {
+  cat("\nWarning:", nrow(failed_rows), "rows had issues with separation:\n")
+  print(failed_rows[, c("county", "county_md", "state_md")])
+}
+
+# Save the cleaned data
+write_csv(df_cleaned, 'md_availability_cleaned.csv')
+```
 
 
 

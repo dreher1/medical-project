@@ -247,6 +247,13 @@ shinyServer(function(input, output, session) {
        This helps identify counties where melanoma disproportionately affects the white population, which may indicate 
        environmental, behavioral, or screening disparities that warrant targeted public health interventions.
      </div>")
+    } else if (choice == "md_availability") {
+      HTML("<div style='padding: 15px; background-color: white; border: 1px solid #4169E1; border-radius: 8px; margin-top: 10px;'>
+     <strong>About Physician Availability:</strong><br>
+     This map displays the number of physicians (MDs) per 100,000 population for each county. 
+     Higher values indicate better healthcare access. This data comes from the md_availability dataset 
+     and may help explain melanoma detection and diagnosis patterns. Gray counties indicate missing data.
+   </div>")
     } else {
       return(NULL)
     }
@@ -582,6 +589,53 @@ shinyServer(function(input, output, session) {
             </div>',
             position = "bottomright",
             layerId = "melanoma_legend"
+          )
+        
+      }
+      # ========== PHYSICIAN AVAILABILITY ==========
+      if (input$melanoma_view == "md_availability") {
+        
+        # Join MD data (FIPS already formatted in global.R)
+        counties_with_data <- state_counties %>%
+          left_join(
+            md_availability %>% 
+              select(fips_md, md_rate_per_100k),
+            by = c("GEOID" = "fips_md")
+          )
+        
+        # Check if data exists
+        if (!"md_rate_per_100k" %in% colnames(counties_with_data)) {
+          showNotification("MD availability data column not found", type = "error")
+          return()
+        }
+        
+        pal <- colorBin(
+          palette = "YlGnBu",
+          domain = counties_with_data$md_rate_per_100k,
+          bins = c(0, 50, 100, 200, 300, 500, 1000, 4600),
+          na.color = "#F0F0F0"
+        )
+        
+        proxy %>%
+          addPolygons(
+            data = counties_with_data,
+            fillColor = ~pal(md_rate_per_100k),
+            weight = 1, opacity = 1, color = "white",
+            layerId = ~GEOID, fillOpacity = 0.7, group = "melanoma",
+            label = ~ifelse(
+              is.na(md_rate_per_100k),
+              paste0(NAME, " County: No MD data available"),
+              paste0(NAME, " County: ", round(md_rate_per_100k, 1), " MDs per 100k")
+            ),
+            highlightOptions = highlightOptions(
+              weight = 2, color = "#665", fillOpacity = 0.9, bringToFront = TRUE
+            )
+          ) %>%
+          addLegend(
+            position = "bottomright", pal = pal,
+            values = counties_with_data$md_rate_per_100k,
+            title = "Physicians<br>per 100,000<br>Population",
+            opacity = 0.7, layerId = "melanoma_legend"
           )
       }
       

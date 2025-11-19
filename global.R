@@ -187,3 +187,37 @@ cat("Counties with occupation data:", nrow(occupation_data), "\n")
 cat("Mean outdoor occupation %:", round(mean(occupation_data$outdoor_pct, na.rm = TRUE), 2), "%\n")
 cat("Range:", round(min(occupation_data$outdoor_pct, na.rm = TRUE), 2), "% to", 
     round(max(occupation_data$outdoor_pct, na.rm = TRUE), 2), "%\n")
+
+#load md availability data table
+md_availability <- read.csv("md_availability_cleaned.csv", stringsAsFactors = FALSE)
+
+# Rename the column to use underscores instead of periods
+if ("md_rate_per_100.000" %in% colnames(md_availability)) {
+  md_availability <- md_availability %>%
+    rename(md_rate_per_100k = md_rate_per_100.000)
+}
+
+# Ensure FIPS is properly formatted
+if ("fips_md" %in% colnames(md_availability)) {
+  # FIPS already exists, just format it
+  md_availability$fips_md <- sprintf("%05d", as.numeric(md_availability$fips_md))
+} else {
+  # Need to create FIPS from county/state names
+  md_availability <- md_availability %>%
+    mutate(
+      county_clean = toupper(str_remove(county_md, "\\s+(County|Parish|Borough|Census Area|Municipality|City and Borough|City)$")),
+      state_clean = toupper(trimws(state_md))
+    ) %>%
+    left_join(county_lookup, by = c("county_clean", "state_clean")) %>%
+    rename(fips_md = GEOID) %>%
+    select(-county_clean, -state_clean)
+}
+
+# Debug output
+cat("\n=== MD AVAILABILITY DATA ===\n")
+cat("Rows loaded:", nrow(md_availability), "\n")
+cat("Columns:", paste(colnames(md_availability), collapse = ", "), "\n")
+cat("Counties with FIPS:", sum(!is.na(md_availability$fips_md)), "\n")
+cat("Counties with rate data:", sum(!is.na(md_availability$md_rate_per_100k)), "\n")
+cat("Rate range:", round(min(md_availability$md_rate_per_100k, na.rm=TRUE), 1), 
+    "to", round(max(md_availability$md_rate_per_100k, na.rm=TRUE), 1), "\n")

@@ -87,8 +87,10 @@ shinyUI(
             "Melanoma by County" = "count",  # Keep your title, add value
             "Melanoma Rate (Age-Adjusted per 100k)" = "rate",  # Keep your title, add value
             "UV Measurement (wmh2)" = "uv",
+            "Physician Availability per 100k" = "md_availability",
             "Bivariate: UV × Melanoma Rate" = "bivariate" ,
-            "Risk-Adjusted: UV × Melanoma (White Pop Weighted)" = "bivariate_weighted"  # NEW
+            "Risk-Adjusted: UV × Melanoma (White Pop Weighted)" = "bivariate_weighted"
+            
           ),
           selected = "count"   
         ),
